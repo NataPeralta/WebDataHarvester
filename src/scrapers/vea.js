@@ -1,8 +1,8 @@
-const BaseScraper = require('../base');
-const SELECTORS = require('./selectors');
-const { parseProductDetails } = require('./parser');
-const { cleanUrl, delay } = require('../../utils');
-const { saveProduct } = require('../../database');
+const BaseScraper = require('./base');
+const SELECTORS = require('./vea/selectors');
+const { parseProductDetails } = require('./vea/parser');
+const { cleanUrl, delay } = require('../utils');
+const { saveProduct } = require('../database');
 
 class VeaScraper extends BaseScraper {
   constructor(maxPages = 100000, delayMs = 1000) {
