@@ -21,25 +21,6 @@ class VeaScraper extends BaseScraper {
     this.processedUrls = new Set();
   }
 
-  async autoScroll(page) {
-    await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        let totalHeight = 0;
-        const distance = 100;
-        const timer = setInterval(() => {
-          const scrollHeight = document.body.scrollHeight;
-          window.scrollBy(0, distance);
-          totalHeight += distance;
-
-          if (totalHeight >= scrollHeight) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, 100);
-      });
-    });
-  }
-
   isValidProductUrl(url) {
     try {
       const urlObj = new URL(url);
@@ -51,7 +32,8 @@ class VeaScraper extends BaseScraper {
       }
 
       // Verificar que termine exactamente en /p
-      if (!urlObj.pathname.endsWith('/p')) {
+      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+      if (pathSegments[pathSegments.length - 1] !== 'p') {
         console.log('URL no termina en /p:', url);
         return false;
       }
@@ -66,7 +48,7 @@ class VeaScraper extends BaseScraper {
       ];
 
       // Si la URL contiene alguno de los patrones inválidos, no es un producto
-      if (invalidPatterns.some(pattern => url.includes(pattern))) {
+      if (invalidPatterns.some(pattern => urlObj.pathname.includes(pattern))) {
         console.log('URL contiene patrón inválido:', url);
         return false;
       }
@@ -94,14 +76,15 @@ class VeaScraper extends BaseScraper {
 
         await this.autoScroll(page);
 
+        // Obtener todos los enlaces y filtrarlos
         const links = await page.evaluate(() => {
           return Array.from(document.querySelectorAll('a[href]'))
             .map(el => el.href)
             .filter(href => href && href.trim().length > 0);
         });
 
+        // Filtrar solo URLs válidas de productos
         const validProducts = links.filter(link => this.isValidProductUrl(link));
-
         console.log(`Found ${validProducts.length} valid products from ${links.length} total links on page ${currentPage}`);
 
         if (validProducts.length === 0) {
@@ -109,6 +92,7 @@ class VeaScraper extends BaseScraper {
           break;
         }
 
+        // Procesar productos válidos
         for (const link of validProducts) {
           const cleanedUrl = cleanUrl(link);
 
@@ -118,7 +102,13 @@ class VeaScraper extends BaseScraper {
             continue;
           }
 
-          // Marcar URL como procesada
+          // Verificar si el producto ya existe en la base de datos
+          const existingProduct = await getProductByUrl(cleanedUrl);
+          if (existingProduct) {
+            console.log(`Producto existente, actualizando precio: ${cleanedUrl}`);
+          }
+
+          // Marcar URL como procesada en esta sesión
           this.processedUrls.add(cleanedUrl);
 
           const productPage = await page.browser().newPage();
