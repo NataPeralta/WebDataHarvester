@@ -1,7 +1,7 @@
 const BaseScraper = require('../base');
 const SELECTORS = require('./selectors');
 const { parseProductDetails } = require('./parser');
-const { cleanUrl } = require('../../utils');
+const { cleanUrl, delay } = require('../../utils');
 const { saveProduct } = require('../../database');
 
 class VeaScraper extends BaseScraper {
@@ -46,13 +46,13 @@ class VeaScraper extends BaseScraper {
         console.log(`Found ${links.length} products`);
         links.forEach(link => this.productLinks.add(cleanUrl(link)));
 
-        await page.waitForTimeout(this.delayMs);
+        await delay(this.delayMs);
         currentPage++;
         retries = 3;
       } catch (e) {
         console.error(`Error fetching ${pageUrl}: ${e.message}`);
         if (--retries <= 0) break;
-        await page.waitForTimeout(this.delayMs * 2);
+        await delay(this.delayMs * 2);
       }
     }
   }
