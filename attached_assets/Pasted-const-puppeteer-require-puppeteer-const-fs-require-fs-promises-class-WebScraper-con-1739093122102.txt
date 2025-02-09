@@ -1,0 +1,163 @@
+const puppeteer = require('puppeteer');
+const fs = require('fs').promises;
+
+class WebScraper {
+  constructor(urls, maxPages = 100000) {
+    this.urls = urls;
+    this.productLinks = new Set();
+    this.maxPages = maxPages;
+  }
+
+  cleanUrl(url) {
+    return url.split('#')[0].replace(/\/$/, '');
+  }
+
+  async autoScroll(page) {
+    await page.evaluate(async () => {
+      await new Promise((resolve, reject) => {
+        let totalHeight = 0;
+        const distance = 100;
+        const timer = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
+      });
+    });
+  }
+
+  async scrapeCategory(page, url) {
+    let currentPage = 1;
+    while (currentPage <= this.maxPages) {
+      const pageUrl = `${url}?page=${currentPage}`;
+      console.error(`Fetching: ${pageUrl}`);
+
+      try {
+        await page.goto(pageUrl, { waitUntil: 'networkidle2' });
+        await this.autoScroll(page);
+
+        const links = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
+            .map(el => el.href)
+            .filter(link => link.endsWith('/p'));
+        });
+
+        if (links.length === 0) break; // No more products found, stop paginating
+
+        console.log(`Productos: ${links.length}`),
+
+        links.forEach(link => {
+            this.productLinks.add(this.cleanUrl(link))
+        }
+        );
+        currentPage++;
+      } catch (e) {
+        console.error(`Error fetching ${pageUrl}: ${e.message}`);
+        break;
+      }
+    }
+  }
+
+  async startScraping() {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+
+    for (const url of this.urls) {
+      await this.scrapeCategory(page, url);
+    }
+
+    await browser.close();
+    await this.saveResults();
+  }
+
+  async saveResults(outputFile = 'products.json') {
+    const results = {
+      timestamp: new Date().toISOString(),
+      total_products: this.productLinks.size,
+      products: [...this.productLinks].sort()
+    };
+
+    await fs.writeFile(outputFile, JSON.stringify(results, null, 2), 'utf-8');
+    console.error(`Results saved to ${outputFile}`);
+  }
+}
+
+(async () => {
+  const urls = [
+    "https://www.vea.com.ar/almacen",
+    "https://www.vea.com.ar/bebidas",
+    "https://www.vea.com.ar/carnes",
+    "https://www.vea.com.ar/lacteos",
+    "https://www.vea.com.ar/perfumeria",
+    "https://www.vea.com.ar/congelados",
+    "https://www.vea.com.ar/limpieza",
+    "https://www.vea.com.ar/panaderia-y-reposteria",
+    "https://www.vea.com.ar/quesos-y-fiambres"
+  ];
+
+  const scraper = new WebScraper(urls);
+  await scraper.startScraping();
+})(); 
+
+Aca tenes info para hacer el scraping del producto
+
+Nombre del producto (Nodo: <h1>):
+
+Producto: Galletitas Oreo Rellenas Con Crema Sabor Original 354 Gr
+Nodo: <h1 class="vtex-store-components-3-x-productNameContainer mv0 t-heading-4">
+Marca (Nodo: <span class="vtex-store-components-3-x-productBrand">):
+
+Marca: OREO
+Nodo: <span class="vtex-store-components-3-x-productBrand">
+SKU (Nodo: <span class="vtex-product-identifier-0-x-product-identifier__value">):
+
+SKU: 11121309066
+Nodo: <span class="vtex-product-identifier-0-x-product-identifier__value">
+Precio con descuento (Nodo: <div id="priceContainer">):
+
+Precio con descuento: $3.150
+Nodo: <div id="priceContainer">
+Descuento (Nodo: <span class="veaargentina-store-theme-SpFtPOZlANEkxX04GqL31">):
+
+Descuento: 35%
+Nodo: <span class="veaargentina-store-theme-SpFtPOZlANEkxX04GqL31">
+Precio original (Nodo: <div class="veaargentina-store-theme-2t-mVsKNpKjmCAEM_AMCQH">):
+
+Precio original: $4.850
+Nodo: <div class="veaargentina-store-theme-2t-mVsKNpKjmCAEM_AMCQH">
+Precio por kilogramo (Nodo: <div class="veaargentina-store-theme-1QiyQadHj-1_x9js9EXUYK">):
+
+Precio por kg: $13.700,56
+Nodo: <div class="veaargentina-store-theme-1QiyQadHj-1_x9js9EXUYK"> 
+
+const imageNode = document.querySelector('.vtex-store-components-3-x-productImageTag'); 
+
+CREATE TABLE products ( 
+    id TEXT PRIMARY KEY,
+    marca TEXT,
+    peso_litraje REAL,
+    nombre TEXT,
+    imagen TEXT,
+    link TEXT
+);
+
+CREATE TABLE prices( 
+    id TEXT PRIMARY KEY,
+    producto_id TEXT,
+    precio REAL,
+    descuento REAL,
+    precio_con_descuento REAL,
+    precio_por_kilo_litraje REAL,
+    condicion_descuento TEXT,
+    dia DATE,
+    FOREIGN KEY (producto_id) REFERENCES productos(id)
+);
+
+Hace todo en diferentes archivos para que tengan su orden 
+
+ 
