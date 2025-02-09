@@ -53,14 +53,16 @@ class VeaScraper extends BaseScraper {
           timeout: 30000 
         });
 
+        // Esperar a que los productos se carguen
         await page.waitForSelector(SELECTORS.productLinks, { timeout: 5000 });
         await this.autoScroll(page);
 
-        const links = await page.evaluate((selectors) => {
-          const products = document.querySelectorAll(selectors.productLinks);
+        // Extraer y filtrar enlaces
+        const links = await page.evaluate((sel) => {
+          const products = document.querySelectorAll(sel.productLinks);
           return Array.from(products)
             .map(a => a.href)
-            .filter(selectors.productLinkFilter);
+            .filter(href => href && href.includes('vea.com.ar') && href.endsWith('/p'));
         }, SELECTORS);
 
         console.log(`Found ${links.length} products on page ${currentPage}`);
@@ -70,6 +72,7 @@ class VeaScraper extends BaseScraper {
           break;
         }
 
+        // Procesar productos
         for (const link of links) {
           const cleanedUrl = cleanUrl(link);
           if (!this.productLinks.has(cleanedUrl)) {
