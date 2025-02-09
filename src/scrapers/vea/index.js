@@ -20,6 +20,25 @@ class VeaScraper extends BaseScraper {
     ];
   }
 
+  async autoScroll(page) {
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        const distance = 100;
+        const timer = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
+      });
+    });
+  }
+
   async scrapeCategory(page, url) {
     let currentPage = 1;
     let retries = 3;
@@ -29,47 +48,45 @@ class VeaScraper extends BaseScraper {
       console.log(`Fetching: ${pageUrl}`);
 
       try {
+        // Navigate to the page and wait for content to load
         await page.goto(pageUrl, { 
-          waitUntil: 'networkidle2',
+          waitUntil: 'networkidle0',
           timeout: 30000 
         });
+
+        // Wait for product grid to be visible
+        await page.waitForSelector('a[href*="/p"]', { timeout: 5000 });
+
+        // Scroll the page to load all content
         await this.autoScroll(page);
 
-        const links = await page.evaluate((sel) => {
-          const links = [];
-          document.querySelectorAll(sel.productLink.selector).forEach(el => {
-            if (sel.productLink.validate(el.href)) {
-              links.push(el.href);
-            }
-          });
-          return links;
-        }, SELECTORS);
+        // Extract product links
+        const links = await page.evaluate(() => {
+          const products = document.querySelectorAll('a[href*="/p"]');
+          return Array.from(products)
+            .map(a => a.href)
+            .filter(href => href.includes('vea.com.ar') && href.endsWith('/p'))
+            .filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
+        });
 
-        console.log(`Found ${links.length} products on page ${currentPage}`);
+        console.log(`Found ${links.length} unique products on page ${currentPage}`);
 
         if (links.length === 0) {
-          console.log('No more products found, ending category scrape');
+          console.log('No more products found, moving to next category');
           break;
         }
 
-        // Procesar cada producto
         for (const link of links) {
           const cleanedUrl = cleanUrl(link);
-          console.log(`Processing product: ${cleanedUrl}`);
-
           if (!this.productLinks.has(cleanedUrl)) {
             this.productLinks.add(cleanedUrl);
-            const productPage = await page.browser().newPage();
-
+            const productPage = await page.browser().newPage(); //Corrected to use page.browser()
             try {
               console.log(`Scraping details for: ${cleanedUrl}`);
               const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
-
               if (productData && productData.product && productData.product.id) {
                 await this.saveProduct(productData);
                 console.log(`Successfully saved product: ${productData.product.id}`);
-              } else {
-                console.error(`Invalid product data for URL: ${cleanedUrl}`);
               }
             } catch (error) {
               console.error(`Error processing product ${cleanedUrl}:`, error.message);
@@ -77,8 +94,6 @@ class VeaScraper extends BaseScraper {
               await productPage.close();
               await delay(this.delayMs);
             }
-          } else {
-            console.log(`Product already processed: ${cleanedUrl}`);
           }
         }
 
@@ -91,7 +106,6 @@ class VeaScraper extends BaseScraper {
           console.log(`Max retries reached for ${pageUrl}, moving to next category`);
           break;
         }
-        console.log(`Retrying ${pageUrl}, attempts left: ${retries}`);
         await delay(this.delayMs * 2);
       }
     }
@@ -99,7 +113,8 @@ class VeaScraper extends BaseScraper {
 
   async scrapeProductDetails(page, url) {
     try {
-      await page.goto(url, { waitUntil: 'networkidle2' });
+      await page.goto(url, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('.vtex-store-components-3-x-productNameContainer', { timeout: 5000 });
       const productData = await parseProductDetails(page, SELECTORS);
 
       if (productData && productData.product) {
@@ -127,12 +142,8 @@ class VeaScraper extends BaseScraper {
 
   async saveProduct(productData) {
     try {
-      console.log('Saving product:', {
-        id: productData.product.id,
-        name: productData.product.name,
-        price: productData.price.discounted_price
-      });
       await saveProduct(productData);
+      console.log(`Saved product: ${productData.product.id} - ${productData.product.name}`);
     } catch (error) {
       console.error('Error saving product:', error.message);
       throw error;
