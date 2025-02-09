@@ -53,8 +53,6 @@ class VeaScraper extends BaseScraper {
           timeout: 30000 
         });
 
-        // Esperar a que los productos se carguen
-        await page.waitForSelector(SELECTORS.productLinks, { timeout: 5000 });
         await this.autoScroll(page);
 
         // Extraer y filtrar enlaces
@@ -62,7 +60,7 @@ class VeaScraper extends BaseScraper {
           const products = document.querySelectorAll(sel.productLinks);
           return Array.from(products)
             .map(a => a.href)
-            .filter(href => href && href.includes('vea.com.ar') && href.endsWith('/p'));
+            .filter(href => href.endsWith('/p'));
         }, SELECTORS);
 
         console.log(`Found ${links.length} products on page ${currentPage}`);

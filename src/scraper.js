@@ -45,12 +45,6 @@ class WebScraper {
         });
         await this.autoScroll(page);
 
-        const links = await page.evaluate(() => {
-          return Array.from(document.querySelectorAll('a[href]'))
-            .map(el => el.href)
-            .filter(link => link.endsWith('/p'));
-        });
-
         if (links.length === 0) break;
 
         console.log(`Found ${links.length} products`);

@@ -4,7 +4,7 @@
 const SELECTORS = {
   // Product list page selectors
   productLinks: 'a[href*="/p"]',
-  productLinkFilter: (href) => href && href.includes('vea.com.ar') && href.endsWith('/p'),
+  productLinkFilter: (href) => href.endsWith('/p'),
 
   // Product detail page selectors
   product: {

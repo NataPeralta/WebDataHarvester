@@ -36,9 +36,9 @@ class VeaScraper extends BaseScraper {
         await this.autoScroll(page);
 
         const links = await page.evaluate((sel) => {
+          console.log(sel)
           return Array.from(document.querySelectorAll(sel.productLinks))
             .map(el => el.href)
-            .filter(sel.productLinkFilter);
         }, SELECTORS);
 
         if (links.length === 0) break;
@@ -101,11 +101,7 @@ class VeaScraper extends BaseScraper {
 
   async saveProduct(productData) {
     try {
-      console.log('Guardando producto en la base de datos:', {
-        id: productData.product.id,
-        nombre: productData.product.name,
-        precio: productData.price.discounted_price
-      });
+      console.log('Guardando producto en DB:', productData.product.id);
       await saveProduct(productData);
     } catch (error) {
       console.error('Error al guardar el producto:', error);
