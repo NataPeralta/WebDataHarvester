@@ -4,70 +4,68 @@ const { extractNumber, cleanText, extractWeightVolume } = require('../../utils')
  * Functions to parse Vea's specific HTML structure into standardized product data
  */
 async function parseProductDetails(page, selectors) {
-  const productData = await page.evaluate((sel) => {
-    const getName = () => {
-      const nameEl = document.querySelector(sel.name);
-      return nameEl ? nameEl.textContent.trim() : '';
-    };
+  try {
+    const productData = await page.evaluate((sel) => {
+      const getTextContent = (selector) => {
+        const element = document.querySelector(selector);
+        return element ? element.textContent.trim() : '';
+      };
 
-    const getBrand = () => {
-      const brandEl = document.querySelector(sel.brand);
-      return brandEl ? brandEl.textContent.trim() : '';
-    };
+      const name = getTextContent(sel.product.name);
+      const brand = getTextContent(sel.product.brand);
+      const sku = getTextContent(sel.product.sku);
 
-    const getSku = () => {
-      const skuEl = document.querySelector(sel.sku);
-      return skuEl ? skuEl.textContent.trim() : '';
-    };
+      const prices = {
+        discountedPrice: getTextContent(sel.prices.discounted),
+        originalPrice: getTextContent(sel.prices.original),
+        pricePerUnit: getTextContent(sel.prices.perUnit),
+        discount: getTextContent(sel.prices.discount)
+      };
 
-    const getPrices = () => {
-      const discountedPrice = document.querySelector(sel.prices.discounted);
-      const originalPrice = document.querySelector(sel.prices.original);
-      const pricePerUnit = document.querySelector(sel.prices.perUnit);
-      const discountEl = document.querySelector(sel.prices.discount);
+      const image = document.querySelector(sel.product.image);
+      const imageUrl = image ? image.src : '';
+
+      if (!name || !sku) {
+        console.error('Missing required product data:', { name, sku });
+        return null;
+      }
 
       return {
-        discountedPrice: discountedPrice ? discountedPrice.textContent : '',
-        originalPrice: originalPrice ? originalPrice.textContent : '',
-        pricePerUnit: pricePerUnit ? pricePerUnit.textContent : '',
-        discount: discountEl ? discountEl.textContent : ''
+        name,
+        brand,
+        sku,
+        prices,
+        image: imageUrl
       };
-    };
+    }, selectors);
 
-    const getImage = () => {
-      const imgEl = document.querySelector(sel.image);
-      return imgEl ? imgEl.src : '';
-    };
+    if (!productData) {
+      throw new Error('Failed to extract product data');
+    }
+
+    const weight_volume = extractWeightVolume(productData.name);
 
     return {
-      name: getName(),
-      brand: getBrand(),
-      sku: getSku(),
-      prices: getPrices(),
-      image: getImage()
+      product: {
+        id: productData.sku,
+        brand: productData.brand,
+        weight_volume: weight_volume,
+        name: productData.name,
+        image_url: productData.image
+      },
+      price: {
+        product_id: productData.sku,
+        original_price: extractNumber(productData.prices.originalPrice),
+        discount_percentage: extractNumber(productData.prices.discount),
+        discounted_price: extractNumber(productData.prices.discountedPrice),
+        price_per_unit: extractNumber(productData.prices.pricePerUnit),
+        discount_conditions: cleanText(productData.prices.discount)
+      }
     };
-  }, selectors);
-
-  // Extraer peso/volumen del nombre del producto
-  const weight_volume = extractWeightVolume(productData.name);
-
-  return {
-    product: {
-      id: productData.sku,
-      brand: productData.brand,
-      weight_volume: weight_volume,
-      name: productData.name,
-      image_url: productData.image
-    },
-    price: {
-      product_id: productData.sku,
-      original_price: extractNumber(productData.prices.originalPrice),
-      discount_percentage: extractNumber(productData.prices.discount),
-      discounted_price: extractNumber(productData.prices.discountedPrice),
-      price_per_unit: extractNumber(productData.prices.pricePerUnit),
-      discount_conditions: cleanText(productData.prices.discount)
-    }
-  };
+  } catch (error) {
+    console.error('Error parsing product details:', error.message);
+    throw error;
+  }
 }
 
 module.exports = { parseProductDetails };

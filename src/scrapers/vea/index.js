@@ -35,33 +35,50 @@ class VeaScraper extends BaseScraper {
         });
         await this.autoScroll(page);
 
-        const links = await page.evaluate(() => {
-          return Array.from(document.querySelectorAll('a[href]'))
-            .map(el => el.href)
-            .filter(link => link.includes('/p'));
-        });
+        const links = await page.evaluate((sel) => {
+          const links = [];
+          document.querySelectorAll(sel.productLink.selector).forEach(el => {
+            if (sel.productLink.validate(el.href)) {
+              links.push(el.href);
+            }
+          });
+          return links;
+        }, SELECTORS);
 
-        if (links.length === 0) break;
+        console.log(`Found ${links.length} products on page ${currentPage}`);
 
-        console.log(`Found ${links.length} products`);
+        if (links.length === 0) {
+          console.log('No more products found, ending category scrape');
+          break;
+        }
 
-        // Procesar cada producto inmediatamente
+        // Procesar cada producto
         for (const link of links) {
           const cleanedUrl = cleanUrl(link);
+          console.log(`Processing product: ${cleanedUrl}`);
+
           if (!this.productLinks.has(cleanedUrl)) {
             this.productLinks.add(cleanedUrl);
-            // Crear una nueva página para cada producto
             const productPage = await page.browser().newPage();
+
             try {
+              console.log(`Scraping details for: ${cleanedUrl}`);
               const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
-              await this.saveProduct(productData);
-              console.log(`Producto guardado: ${productData.product.id}`);
+
+              if (productData && productData.product && productData.product.id) {
+                await this.saveProduct(productData);
+                console.log(`Successfully saved product: ${productData.product.id}`);
+              } else {
+                console.error(`Invalid product data for URL: ${cleanedUrl}`);
+              }
             } catch (error) {
-              console.error(`Error al procesar producto ${cleanedUrl}:`, error);
+              console.error(`Error processing product ${cleanedUrl}:`, error.message);
             } finally {
               await productPage.close();
-              await delay(this.delayMs); // Esperar entre productos
+              await delay(this.delayMs);
             }
+          } else {
+            console.log(`Product already processed: ${cleanedUrl}`);
           }
         }
 
@@ -69,46 +86,55 @@ class VeaScraper extends BaseScraper {
         currentPage++;
         retries = 3;
       } catch (e) {
-        console.error(`Error fetching ${pageUrl}: ${e.message}`);
-        if (--retries <= 0) break;
+        console.error(`Error fetching ${pageUrl}:`, e.message);
+        if (--retries <= 0) {
+          console.log(`Max retries reached for ${pageUrl}, moving to next category`);
+          break;
+        }
+        console.log(`Retrying ${pageUrl}, attempts left: ${retries}`);
         await delay(this.delayMs * 2);
       }
     }
   }
 
   async scrapeProductDetails(page, url) {
-    await page.goto(url, { waitUntil: 'networkidle2' });
-    const productData = await parseProductDetails(page, SELECTORS);
+    try {
+      await page.goto(url, { waitUntil: 'networkidle2' });
+      const productData = await parseProductDetails(page, SELECTORS);
 
-    // Asegurarse de que todos los campos necesarios estén presentes
-    if (productData && productData.product) {
-      productData.product.retailer_id = this.retailerId;
-      productData.product.product_url = url;
-    }
-    if (productData && productData.price) {
-      productData.price.retailer_id = this.retailerId;
-      productData.price.date = new Date().toISOString().split('T')[0];
-    }
+      if (productData && productData.product) {
+        productData.product.retailer_id = this.retailerId;
+        productData.product.product_url = url;
+      }
+      if (productData && productData.price) {
+        productData.price.retailer_id = this.retailerId;
+        productData.price.date = new Date().toISOString().split('T')[0];
+      }
 
-    return productData;
+      return productData;
+    } catch (error) {
+      console.error(`Error scraping product details for ${url}:`, error.message);
+      throw error;
+    }
   }
 
   async scrapeCategoryPages(page) {
     for (const url of this.categories) {
+      console.log(`Starting category: ${url}`);
       await this.scrapeCategory(page, url);
     }
   }
 
   async saveProduct(productData) {
     try {
-      console.log('Guardando producto en la base de datos:', {
+      console.log('Saving product:', {
         id: productData.product.id,
-        nombre: productData.product.name,
-        precio: productData.price.discounted_price
+        name: productData.product.name,
+        price: productData.price.discounted_price
       });
       await saveProduct(productData);
     } catch (error) {
-      console.error('Error al guardar el producto:', error);
+      console.error('Error saving product:', error.message);
       throw error;
     }
   }
