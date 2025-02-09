@@ -5,7 +5,7 @@ const { cleanUrl, delay } = require('../../utils');
 const { saveProduct, getProductByUrl } = require('../../database');
 
 class VeaScraper extends BaseScraper {
-  constructor(maxPages = 100000, delayMs = 1000) {
+  constructor(maxPages = 100000, delayMs = 500) { // Reducido el delay a 500ms
     super('VEA', maxPages, delayMs);
     this.categories = [
       "https://www.vea.com.ar/almacen",
@@ -19,13 +19,14 @@ class VeaScraper extends BaseScraper {
       "https://www.vea.com.ar/quesos-y-fiambres"
     ];
     this.processedUrls = new Set();
+    this.maxConcurrent = 10; // Aumentado a 10 productos en paralelo
   }
 
   async autoScroll(page) {
     await page.evaluate(async () => {
       await new Promise((resolve) => {
         let totalHeight = 0;
-        const distance = 100;
+        const distance = 200; // Aumentado para scroll más rápido
         const timer = setInterval(() => {
           const scrollHeight = document.body.scrollHeight;
           window.scrollBy(0, distance);
@@ -35,7 +36,7 @@ class VeaScraper extends BaseScraper {
             clearInterval(timer);
             resolve();
           }
-        }, 100);
+        }, 25); // Reducido el intervalo de scroll
       });
     });
   }
@@ -43,40 +44,39 @@ class VeaScraper extends BaseScraper {
   isValidProductUrl(url) {
     try {
       const urlObj = new URL(url);
-
-      // Verificar que sea un dominio de Vea
-      if (!urlObj.hostname.endsWith('vea.com.ar')) {
-        console.log(`URL no pertenece a vea.com.ar: ${url}`);
-        return false;
-      }
-
-      // Verificar que termine exactamente en /p
-      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
-      if (pathSegments[pathSegments.length - 1] !== 'p') {
-        console.log(`URL no termina en /p: ${url}`);
-        return false;
-      }
-
-      // Lista de patrones de URLs inválidas
-      const invalidPatterns = [
-        'politica-de-privacidad',
-        'defensadelconsumidor',
-        'conoce-tus-derechos',
-        'tarjetacencosud',
-        'argentina.gob.ar'
-      ];
-
-      // Si la URL contiene alguno de los patrones inválidos, no es un producto
-      if (invalidPatterns.some(pattern => urlObj.pathname.includes(pattern))) {
-        console.log(`URL contiene patrón inválido: ${url}`);
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      console.error('Error al validar URL:', url, e.message);
+      return urlObj.hostname.endsWith('vea.com.ar') && 
+             urlObj.pathname.split('/').filter(Boolean).pop() === 'p' &&
+             !['politica-de-privacidad', 'defensadelconsumidor', 'conoce-tus-derechos', 
+               'tarjetacencosud', 'argentina.gob.ar'].some(pattern => url.includes(pattern));
+    } catch {
       return false;
     }
+  }
+
+  async processProductBatch(browser, productUrls) {
+    const pages = await Promise.all(Array(this.maxConcurrent).fill(0).map(() => browser.newPage()));
+    const results = [];
+
+    for (let i = 0; i < productUrls.length; i += this.maxConcurrent) {
+      const batch = productUrls.slice(i, i + this.maxConcurrent);
+      const batchPromises = batch.map(async (url, index) => {
+        const page = pages[index];
+        try {
+          const productData = await this.scrapeProductDetails(page, url);
+          if (productData) {
+            await saveProduct(productData);
+          }
+        } catch (error) {
+          console.error(`Error processing ${url}:`, error.message);
+        }
+      });
+
+      await Promise.all(batchPromises);
+      await delay(this.delayMs);
+    }
+
+    await Promise.all(pages.map(page => page.close()));
+    return results;
   }
 
   async scrapeCategory(page, url) {
@@ -85,7 +85,6 @@ class VeaScraper extends BaseScraper {
 
     while (currentPage <= this.maxPages) {
       const pageUrl = `${url}?page=${currentPage}`;
-      console.log(`Fetching: ${pageUrl}`);
 
       try {
         await page.goto(pageUrl, { 
@@ -95,105 +94,67 @@ class VeaScraper extends BaseScraper {
 
         await this.autoScroll(page);
 
-        // Obtener todos los enlaces y filtrarlos
-        const links = await page.evaluate(() => {
-          return Array.from(document.querySelectorAll('a[href]'))
+        const links = await page.evaluate(() => 
+          Array.from(document.querySelectorAll('a[href]'))
             .map(el => el.href)
-            .filter(href => href && href.trim().length > 0);
-        });
+            .filter(href => href?.trim())
+        );
 
-        // Filtrar solo URLs válidas de productos
-        const validProducts = links.filter(link => this.isValidProductUrl(link));
-        console.log(`Found ${validProducts.length} valid products from ${links.length} total links on page ${currentPage}`);
+        const validProducts = links
+          .filter(link => this.isValidProductUrl(link))
+          .map(cleanUrl)
+          .filter(url => !this.processedUrls.has(url));
 
-        if (validProducts.length === 0) {
-          console.log('No more valid products found, moving to next category');
-          break;
-        }
+        if (validProducts.length === 0) break;
 
-        // Procesar productos válidos
-        for (const link of validProducts) {
-          const cleanedUrl = cleanUrl(link);
+        console.log(`Processing ${validProducts.length} products from ${pageUrl}`);
+        await this.processProductBatch(page.browser(), validProducts);
+        validProducts.forEach(url => this.processedUrls.add(url));
 
-          // Verificar si ya procesamos esta URL en esta sesión
-          if (this.processedUrls.has(cleanedUrl)) {
-            console.log(`URL ya procesada en esta sesión: ${cleanedUrl}`);
-            continue;
-          }
-
-          // Verificar si el producto ya existe en la base de datos
-          const existingProduct = await getProductByUrl(cleanedUrl);
-          if (existingProduct) {
-            console.log(`Producto existente, actualizando precio: ${cleanedUrl}`);
-          }
-
-          // Marcar URL como procesada en esta sesión
-          this.processedUrls.add(cleanedUrl);
-
-          const productPage = await page.browser().newPage();
-          try {
-            console.log(`Scraping details for: ${cleanedUrl}`);
-            const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
-            if (productData && productData.product && productData.product.id) {
-              await this.saveProduct(productData);
-            }
-          } catch (error) {
-            console.error(`Error processing product ${cleanedUrl}:`, error.message);
-          } finally {
-            await productPage.close();
-            await delay(this.delayMs);
-          }
-        }
-
-        await delay(this.delayMs);
         currentPage++;
         retries = 3;
       } catch (e) {
-        console.error(`Error fetching ${pageUrl}:`, e.message);
-        if (--retries <= 0) {
-          console.log(`Max retries reached for ${pageUrl}, moving to next category`);
-          break;
-        }
-        await delay(this.delayMs * 2);
+        console.error(`Error en página ${pageUrl}:`, e.message);
+        if (--retries <= 0) break;
+        await delay(this.delayMs);
       }
     }
   }
 
   async scrapeProductDetails(page, url) {
     try {
-      await page.goto(url, { waitUntil: 'networkidle0' });
-      await page.waitForSelector(SELECTORS.product.name, { timeout: 5000 });
-      const productData = await parseProductDetails(page, SELECTORS);
+      await page.goto(url, { 
+        waitUntil: 'networkidle0',
+        timeout: 15000 // Reducido el timeout
+      });
 
-      if (productData && productData.product) {
+      const productData = await parseProductDetails(page, SELECTORS);
+      if (productData?.product) {
         productData.product.retailer_id = this.retailerId;
         productData.product.product_url = url;
       }
-      if (productData && productData.price) {
+      if (productData?.price) {
         productData.price.retailer_id = this.retailerId;
         productData.price.date = new Date().toISOString().split('T')[0];
       }
-
       return productData;
     } catch (error) {
-      console.error(`Error scraping product details for ${url}:`, error.message);
+      console.error(`Error scraping ${url}:`, error.message);
       throw error;
     }
   }
 
   async scrapeCategoryPages(page) {
     for (const url of this.categories) {
-      console.log(`Starting category: ${url}`);
       await this.scrapeCategory(page, url);
     }
   }
 
   async saveProduct(productData) {
     try {
-      console.log('Guardando/actualizando producto:', productData.product.id);
       await saveProduct(productData);
     } catch (error) {
-      console.error('Error al guardar el producto:', error.message);
+      console.error('Error al guardar producto:', error.message);
       throw error;
     }
   }
