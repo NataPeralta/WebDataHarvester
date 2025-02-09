@@ -3,6 +3,7 @@ const path = require('path');
 
 const dbPath = path.join(__dirname, '..', 'data', 'products.db');
 
+// Crear el objeto de base de datos
 const db = new sqlite3.Database(dbPath);
 
 async function initializeDatabase() {
@@ -95,15 +96,6 @@ async function saveProduct(productData) {
   });
 }
 
-async function getRetailer(id) {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM retailers WHERE id = ?', [id], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-}
-
 async function getProduct(id) {
   return new Promise((resolve, reject) => {
     db.get('SELECT * FROM products WHERE id = ?', [id], (err, row) => {
@@ -129,7 +121,6 @@ async function getLatestPrice(productId) {
 module.exports = {
   initializeDatabase,
   saveProduct,
-  getRetailer,
   getProduct,
   getLatestPrice
 };

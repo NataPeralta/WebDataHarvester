@@ -10,9 +10,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4",
-    "drizzle-orm": "^0.39.2",
-    "pg": "^8.13.1",
     "puppeteer": "^24.2.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
