@@ -48,28 +48,22 @@ class VeaScraper extends BaseScraper {
       console.log(`Fetching: ${pageUrl}`);
 
       try {
-        // Navigate to the page and wait for content to load
         await page.goto(pageUrl, { 
           waitUntil: 'networkidle0',
           timeout: 30000 
         });
 
-        // Wait for product grid to be visible
-        await page.waitForSelector('a[href*="/p"]', { timeout: 5000 });
-
-        // Scroll the page to load all content
+        await page.waitForSelector(SELECTORS.productLinks, { timeout: 5000 });
         await this.autoScroll(page);
 
-        // Extract product links
-        const links = await page.evaluate(() => {
-          const products = document.querySelectorAll('a[href*="/p"]');
+        const links = await page.evaluate((selectors) => {
+          const products = document.querySelectorAll(selectors.productLinks);
           return Array.from(products)
             .map(a => a.href)
-            .filter(href => href.includes('vea.com.ar') && href.endsWith('/p'))
-            .filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
-        });
+            .filter(selectors.productLinkFilter);
+        }, SELECTORS);
 
-        console.log(`Found ${links.length} unique products on page ${currentPage}`);
+        console.log(`Found ${links.length} products on page ${currentPage}`);
 
         if (links.length === 0) {
           console.log('No more products found, moving to next category');
@@ -80,7 +74,7 @@ class VeaScraper extends BaseScraper {
           const cleanedUrl = cleanUrl(link);
           if (!this.productLinks.has(cleanedUrl)) {
             this.productLinks.add(cleanedUrl);
-            const productPage = await page.browser().newPage(); //Corrected to use page.browser()
+            const productPage = await page.browser().newPage();
             try {
               console.log(`Scraping details for: ${cleanedUrl}`);
               const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
@@ -114,7 +108,7 @@ class VeaScraper extends BaseScraper {
   async scrapeProductDetails(page, url) {
     try {
       await page.goto(url, { waitUntil: 'networkidle0' });
-      await page.waitForSelector('.vtex-store-components-3-x-productNameContainer', { timeout: 5000 });
+      await page.waitForSelector(SELECTORS.product.name, { timeout: 5000 });
       const productData = await parseProductDetails(page, SELECTORS);
 
       if (productData && productData.product) {
@@ -143,7 +137,6 @@ class VeaScraper extends BaseScraper {
   async saveProduct(productData) {
     try {
       await saveProduct(productData);
-      console.log(`Saved product: ${productData.product.id} - ${productData.product.name}`);
     } catch (error) {
       console.error('Error saving product:', error.message);
       throw error;
