@@ -1,4 +1,4 @@
-const { extractNumber, cleanText } = require('../../utils');
+const { extractNumber, cleanText, extractWeightVolume } = require('../../utils');
 
 /**
  * Functions to parse Vea's specific HTML structure into standardized product data
@@ -48,22 +48,19 @@ async function parseProductDetails(page, selectors) {
     };
   }, selectors);
 
-  const weightMatch = productData.name.match(/\d+\s*(?:gr|ml|kg|l)/i);
-  const weight = weightMatch ? extractNumber(weightMatch[0]) : null;
+  // Extraer peso/volumen del nombre del producto
+  const weight_volume = extractWeightVolume(productData.name);
 
   return {
     product: {
       id: productData.sku,
-      retailer_id: 'VEA',
       brand: productData.brand,
-      weight_volume: weight,
+      weight_volume: weight_volume,
       name: productData.name,
-      image_url: productData.image,
-      product_url: page.url()
+      image_url: productData.image
     },
     price: {
       product_id: productData.sku,
-      retailer_id: 'VEA',
       original_price: extractNumber(productData.prices.originalPrice),
       discount_percentage: extractNumber(productData.prices.discount),
       discounted_price: extractNumber(productData.prices.discountedPrice),

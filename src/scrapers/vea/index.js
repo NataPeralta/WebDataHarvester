@@ -59,7 +59,19 @@ class VeaScraper extends BaseScraper {
 
   async scrapeProductDetails(page, url) {
     await page.goto(url, { waitUntil: 'networkidle2' });
-    return parseProductDetails(page, SELECTORS);
+    const productData = await parseProductDetails(page, SELECTORS);
+
+    // Asegurarse de que todos los campos necesarios estén presentes
+    if (productData && productData.product) {
+      productData.product.retailer_id = this.retailerId;
+      productData.product.product_url = url;
+    }
+    if (productData && productData.price) {
+      productData.price.retailer_id = this.retailerId;
+      productData.price.date = new Date().toISOString().split('T')[0];
+    }
+
+    return productData;
   }
 
   async scrapeCategoryPages(page) {
@@ -69,7 +81,17 @@ class VeaScraper extends BaseScraper {
   }
 
   async saveProduct(productData) {
-    await saveProduct(productData);
+    try {
+      console.log('Guardando producto en la base de datos:', {
+        id: productData.product.id,
+        nombre: productData.product.name,
+        precio: productData.price.discounted_price
+      });
+      await saveProduct(productData);
+    } catch (error) {
+      console.error('Error al guardar el producto:', error);
+      throw error;
+    }
   }
 }
 

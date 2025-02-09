@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.dbus
     pkgs.cairo
     pkgs.pango
     pkgs.cups

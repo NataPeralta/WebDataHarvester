@@ -56,24 +56,41 @@ class BaseScraper {
   async scrapeProducts(browser) {
     const products = [...this.productLinks];
     console.log(`Starting to scrape ${products.length} individual products for ${this.retailerId}`);
+    let successCount = 0;
+    let errorCount = 0;
 
     for (const productUrl of products) {
       try {
         const page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+        console.log(`Scraping product: ${productUrl}`);
         const productData = await this.scrapeProductDetails(page, productUrl);
-        await this.saveProduct(productData);
+
+        if (productData && productData.product && productData.product.id) {
+          await this.saveProduct(productData);
+          console.log(`Successfully saved product: ${productData.product.id}`);
+          successCount++;
+        } else {
+          console.error(`Invalid product data for URL: ${productUrl}`);
+          errorCount++;
+        }
+
         await page.close();
         await delay(this.delayMs);
       } catch (e) {
         console.error(`Error scraping product ${productUrl}: ${e.message}`);
+        errorCount++;
       }
     }
+
+    console.log(`Scraping completed. Success: ${successCount}, Errors: ${errorCount}`);
   }
 
   async startScraping() {
     const browser = await puppeteer.launch({ 
       headless: 'new',
+      executablePath: '/nix/store/chromium/bin/chromium',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

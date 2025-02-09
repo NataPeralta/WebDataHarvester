@@ -56,6 +56,7 @@ async function saveProduct(productData) {
   const { product, price } = productData;
 
   try {
+    // Insertar o actualizar el producto
     await database.run(
       `INSERT OR REPLACE INTO products (
         id, retailer_id, brand, weight_volume, name, image_url, product_url
@@ -71,6 +72,7 @@ async function saveProduct(productData) {
       ]
     );
 
+    // Insertar el nuevo precio
     await database.run(
       `INSERT INTO prices (
         id, product_id, retailer_id, original_price, discount_percentage,
@@ -87,8 +89,11 @@ async function saveProduct(productData) {
         price.discount_conditions
       ]
     );
+
+    console.log(`Producto guardado exitosamente: ${product.id}`);
+    console.log(`Precio guardado exitosamente: ${price.product_id}`);
   } catch (error) {
-    console.error('Error saving product:', error);
+    console.error('Error al guardar en la base de datos:', error);
     throw error;
   }
 }
@@ -98,8 +103,23 @@ async function getRetailer(id) {
   return database.get('SELECT * FROM retailers WHERE id = ?', [id]);
 }
 
+async function getProduct(id) {
+  const database = await initializeDatabase();
+  return database.get('SELECT * FROM products WHERE id = ?', [id]);
+}
+
+async function getLatestPrice(productId) {
+  const database = await initializeDatabase();
+  return database.get(
+    'SELECT * FROM prices WHERE product_id = ? ORDER BY date DESC LIMIT 1',
+    [productId]
+  );
+}
+
 module.exports = {
   initializeDatabase,
   saveProduct,
-  getRetailer
+  getRetailer,
+  getProduct,
+  getLatestPrice
 };
