@@ -21,20 +21,39 @@ class VeaScraper extends BaseScraper {
     this.processedUrls = new Set();
   }
 
+  async autoScroll(page) {
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        const distance = 100;
+        const timer = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
+      });
+    });
+  }
+
   isValidProductUrl(url) {
     try {
       const urlObj = new URL(url);
 
       // Verificar que sea un dominio de Vea
       if (!urlObj.hostname.endsWith('vea.com.ar')) {
-        console.log('URL no pertenece a vea.com.ar:', url);
+        console.log(`URL no pertenece a vea.com.ar: ${url}`);
         return false;
       }
 
       // Verificar que termine exactamente en /p
       const pathSegments = urlObj.pathname.split('/').filter(Boolean);
       if (pathSegments[pathSegments.length - 1] !== 'p') {
-        console.log('URL no termina en /p:', url);
+        console.log(`URL no termina en /p: ${url}`);
         return false;
       }
 
@@ -49,7 +68,7 @@ class VeaScraper extends BaseScraper {
 
       // Si la URL contiene alguno de los patrones inválidos, no es un producto
       if (invalidPatterns.some(pattern => urlObj.pathname.includes(pattern))) {
-        console.log('URL contiene patrón inválido:', url);
+        console.log(`URL contiene patrón inválido: ${url}`);
         return false;
       }
 
