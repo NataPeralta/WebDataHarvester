@@ -1,26 +1,2 @@
-const { Pool } = require('pg');
-
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL must be set');
-}
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? {
-    rejectUnauthorized: false
-  } : false
-});
-
-async function query(text, params) {
-  const client = await pool.connect();
-  try {
-    return await client.query(text, params);
-  } finally {
-    client.release();
-  }
-}
-
-module.exports = {
-  query,
-  pool
-};
+// Este archivo ya no es necesario ya que estamos usando SQLite3 directamente
+// La configuración de la base de datos se encuentra en database.js
