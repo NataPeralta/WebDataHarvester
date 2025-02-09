@@ -17,7 +17,7 @@ async function initializeDatabase() {
         weight_volume REAL,
         name TEXT NOT NULL,
         image_url TEXT,
-        product_url TEXT
+        product_url TEXT UNIQUE
       )`);
 
       // Crear tabla de precios
@@ -32,7 +32,12 @@ async function initializeDatabase() {
         discount_conditions TEXT,
         date TEXT NOT NULL,
         FOREIGN KEY (product_id) REFERENCES products(id)
-      )`, (err) => {
+      )`);
+
+      // Crear índice para búsqueda rápida por URL
+      db.run(`CREATE INDEX IF NOT EXISTS idx_product_url ON products(product_url)`);
+
+      db.run(`CREATE INDEX IF NOT EXISTS idx_prices_date ON prices(date, product_id)`, (err) => {
         if (err) reject(err);
         else resolve();
       });
@@ -40,59 +45,108 @@ async function initializeDatabase() {
   });
 }
 
+async function getProductByUrl(url) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM products WHERE product_url = ?', [url], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+async function getPriceForDate(productId, date) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      'SELECT * FROM prices WHERE product_id = ? AND date = ?',
+      [productId, date],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      }
+    );
+  });
+}
+
 async function saveProduct(productData) {
   const { product, price } = productData;
+  const today = new Date().toISOString().split('T')[0];
 
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Comenzar transacción
-      db.run('BEGIN TRANSACTION');
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Verificar si el producto ya existe
+      const existingProduct = await getProductByUrl(product.product_url);
 
-      try {
-        // Insertar o actualizar producto
-        db.run(`
-          INSERT OR REPLACE INTO products (
-            id, retailer_id, brand, weight_volume, name, image_url, product_url
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [
-          product.id,
-          product.retailer_id,
-          product.brand,
-          product.weight_volume,
-          product.name,
-          product.image_url,
-          product.product_url
-        ]);
+      db.serialize(async () => {
+        db.run('BEGIN TRANSACTION');
 
-        // Insertar nuevo precio
-        db.run(`
-          INSERT INTO prices (
-            id, product_id, retailer_id, original_price, discount_percentage,
-            discounted_price, price_per_unit, discount_conditions, date
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))
-        `, [
-          `${price.product_id}_${Date.now()}`,
-          price.product_id,
-          price.retailer_id,
-          price.original_price,
-          price.discount_percentage,
-          price.discounted_price,
-          price.price_per_unit,
-          price.discount_conditions
-        ], (err) => {
-          if (err) {
-            db.run('ROLLBACK');
-            reject(err);
+        try {
+          // Si el producto no existe, insertarlo
+          if (!existingProduct) {
+            console.log('Insertando nuevo producto:', product.id);
+            db.run(`
+              INSERT INTO products (
+                id, retailer_id, brand, weight_volume, name, image_url, product_url
+              ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [
+              product.id,
+              product.retailer_id,
+              product.brand,
+              product.weight_volume,
+              product.name,
+              product.image_url,
+              product.product_url
+            ]);
+          }
+
+          // Verificar si ya existe un precio para hoy
+          const existingPrice = await getPriceForDate(
+            existingProduct ? existingProduct.id : product.id,
+            today
+          );
+
+          if (!existingPrice) {
+            console.log('Insertando nuevo precio para el día:', today);
+            // Insertar nuevo precio solo si no existe uno para hoy
+            db.run(`
+              INSERT INTO prices (
+                id, product_id, retailer_id, original_price, discount_percentage,
+                discounted_price, price_per_unit, discount_conditions, date
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              `${price.product_id}_${Date.now()}`,
+              existingProduct ? existingProduct.id : product.id,
+              price.retailer_id,
+              price.original_price,
+              price.discount_percentage,
+              price.discounted_price,
+              price.price_per_unit,
+              price.discount_conditions,
+              today
+            ], (err) => {
+              if (err) {
+                console.error('Error al insertar precio:', err);
+                db.run('ROLLBACK');
+                reject(err);
+              } else {
+                db.run('COMMIT');
+                resolve();
+              }
+            });
           } else {
+            console.log('Ya existe un precio para hoy, omitiendo actualización');
             db.run('COMMIT');
             resolve();
           }
-        });
-      } catch (error) {
-        db.run('ROLLBACK');
-        reject(error);
-      }
-    });
+        } catch (error) {
+          console.error('Error en la transacción:', error);
+          db.run('ROLLBACK');
+          reject(error);
+        }
+      });
+    } catch (error) {
+      console.error('Error al verificar producto existente:', error);
+      reject(error);
+    }
   });
 }
 
@@ -122,5 +176,6 @@ module.exports = {
   initializeDatabase,
   saveProduct,
   getProduct,
-  getLatestPrice
+  getLatestPrice,
+  getProductByUrl
 };

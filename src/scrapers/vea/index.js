@@ -2,7 +2,7 @@ const BaseScraper = require('../base');
 const SELECTORS = require('./selectors');
 const { parseProductDetails } = require('./parser');
 const { cleanUrl, delay } = require('../../utils');
-const { saveProduct } = require('../../database');
+const { saveProduct, getProductByUrl } = require('../../database');
 
 class VeaScraper extends BaseScraper {
   constructor(maxPages = 100000, delayMs = 1000) {
@@ -18,6 +18,7 @@ class VeaScraper extends BaseScraper {
       "https://www.vea.com.ar/panaderia-y-reposteria",
       "https://www.vea.com.ar/quesos-y-fiambres"
     ];
+    this.processedUrls = new Set();
   }
 
   async autoScroll(page) {
@@ -39,6 +40,44 @@ class VeaScraper extends BaseScraper {
     });
   }
 
+  isValidProductUrl(url) {
+    try {
+      const urlObj = new URL(url);
+
+      // Verificar que sea un dominio de Vea
+      if (!urlObj.hostname.endsWith('vea.com.ar')) {
+        console.log('URL no pertenece a vea.com.ar:', url);
+        return false;
+      }
+
+      // Verificar que termine exactamente en /p
+      if (!urlObj.pathname.endsWith('/p')) {
+        console.log('URL no termina en /p:', url);
+        return false;
+      }
+
+      // Lista de patrones de URLs inválidas
+      const invalidPatterns = [
+        'politica-de-privacidad',
+        'defensadelconsumidor',
+        'conoce-tus-derechos',
+        'tarjetacencosud',
+        'argentina.gob.ar'
+      ];
+
+      // Si la URL contiene alguno de los patrones inválidos, no es un producto
+      if (invalidPatterns.some(pattern => url.includes(pattern))) {
+        console.log('URL contiene patrón inválido:', url);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Error al validar URL:', url, e.message);
+      return false;
+    }
+  }
+
   async scrapeCategory(page, url) {
     let currentPage = 1;
     let retries = 3;
@@ -55,40 +94,45 @@ class VeaScraper extends BaseScraper {
 
         await this.autoScroll(page);
 
-        // Extraer y filtrar enlaces
-        const links = await page.evaluate((sel) => {
-          const products = document.querySelectorAll(sel.productLinks);
-          return Array.from(products)
-            .map(a => a.href)
-            .filter(href => href.endsWith('/p'));
-        }, SELECTORS);
+        const links = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
+            .map(el => el.href)
+            .filter(href => href && href.trim().length > 0);
+        });
 
-        console.log(`Found ${links.length} products on page ${currentPage}`);
+        const validProducts = links.filter(link => this.isValidProductUrl(link));
 
-        if (links.length === 0) {
-          console.log('No more products found, moving to next category');
+        console.log(`Found ${validProducts.length} valid products from ${links.length} total links on page ${currentPage}`);
+
+        if (validProducts.length === 0) {
+          console.log('No more valid products found, moving to next category');
           break;
         }
 
-        // Procesar productos
-        for (const link of links) {
+        for (const link of validProducts) {
           const cleanedUrl = cleanUrl(link);
-          if (!this.productLinks.has(cleanedUrl)) {
-            this.productLinks.add(cleanedUrl);
-            const productPage = await page.browser().newPage();
-            try {
-              console.log(`Scraping details for: ${cleanedUrl}`);
-              const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
-              if (productData && productData.product && productData.product.id) {
-                await this.saveProduct(productData);
-                console.log(`Successfully saved product: ${productData.product.id}`);
-              }
-            } catch (error) {
-              console.error(`Error processing product ${cleanedUrl}:`, error.message);
-            } finally {
-              await productPage.close();
-              await delay(this.delayMs);
+
+          // Verificar si ya procesamos esta URL en esta sesión
+          if (this.processedUrls.has(cleanedUrl)) {
+            console.log(`URL ya procesada en esta sesión: ${cleanedUrl}`);
+            continue;
+          }
+
+          // Marcar URL como procesada
+          this.processedUrls.add(cleanedUrl);
+
+          const productPage = await page.browser().newPage();
+          try {
+            console.log(`Scraping details for: ${cleanedUrl}`);
+            const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
+            if (productData && productData.product && productData.product.id) {
+              await this.saveProduct(productData);
             }
+          } catch (error) {
+            console.error(`Error processing product ${cleanedUrl}:`, error.message);
+          } finally {
+            await productPage.close();
+            await delay(this.delayMs);
           }
         }
 
@@ -137,9 +181,10 @@ class VeaScraper extends BaseScraper {
 
   async saveProduct(productData) {
     try {
+      console.log('Guardando/actualizando producto:', productData.product.id);
       await saveProduct(productData);
     } catch (error) {
-      console.error('Error saving product:', error.message);
+      console.error('Error al guardar el producto:', error.message);
       throw error;
     }
   }
