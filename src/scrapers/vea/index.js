@@ -35,16 +35,35 @@ class VeaScraper extends BaseScraper {
         });
         await this.autoScroll(page);
 
-        const links = await page.evaluate((sel) => {
-          return Array.from(document.querySelectorAll(sel.productLinks))
+        const links = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
             .map(el => el.href)
-            .filter(sel.productLinkFilter);
-        }, SELECTORS);
+            .filter(link => link.includes('/p'));
+        });
 
         if (links.length === 0) break;
 
         console.log(`Found ${links.length} products`);
-        links.forEach(link => this.productLinks.add(cleanUrl(link)));
+
+        // Procesar cada producto inmediatamente
+        for (const link of links) {
+          const cleanedUrl = cleanUrl(link);
+          if (!this.productLinks.has(cleanedUrl)) {
+            this.productLinks.add(cleanedUrl);
+            // Crear una nueva página para cada producto
+            const productPage = await page.browser().newPage();
+            try {
+              const productData = await this.scrapeProductDetails(productPage, cleanedUrl);
+              await this.saveProduct(productData);
+              console.log(`Producto guardado: ${productData.product.id}`);
+            } catch (error) {
+              console.error(`Error al procesar producto ${cleanedUrl}:`, error);
+            } finally {
+              await productPage.close();
+              await delay(this.delayMs); // Esperar entre productos
+            }
+          }
+        }
 
         await delay(this.delayMs);
         currentPage++;
