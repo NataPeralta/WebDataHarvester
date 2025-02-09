@@ -1,66 +1,25 @@
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
-const path = require('path');
-
-let db;
+const { query } = require('./db');
 
 async function initializeDatabase() {
-  if (db) return db;
-
-  db = await open({
-    filename: path.join(__dirname, '../data/products.db'),
-    driver: sqlite3.Database
-  });
-
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS retailers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      base_url TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      retailer_id TEXT NOT NULL,
-      brand TEXT,
-      weight_volume REAL,
-      name TEXT,
-      image_url TEXT,
-      product_url TEXT,
-      FOREIGN KEY (retailer_id) REFERENCES retailers(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS prices (
-      id TEXT PRIMARY KEY,
-      product_id TEXT,
-      retailer_id TEXT,
-      original_price REAL,
-      discount_percentage REAL,
-      discounted_price REAL,
-      price_per_unit REAL,
-      discount_conditions TEXT,
-      date DATE,
-      FOREIGN KEY (product_id) REFERENCES products(id),
-      FOREIGN KEY (retailer_id) REFERENCES retailers(id)
-    );
-
-    INSERT OR IGNORE INTO retailers (id, name, base_url) VALUES 
-    ('VEA', 'Vea', 'https://www.vea.com.ar');
-  `);
-
-  return db;
+  // Las tablas ya se crearon usando execute_sql_tool
+  return true;
 }
 
 async function saveProduct(productData) {
-  const database = await initializeDatabase();
   const { product, price } = productData;
 
   try {
     // Insertar o actualizar el producto
-    await database.run(
-      `INSERT OR REPLACE INTO products (
+    await query(
+      `INSERT INTO products (
         id, retailer_id, brand, weight_volume, name, image_url, product_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (id) DO UPDATE SET
+        brand = EXCLUDED.brand,
+        weight_volume = EXCLUDED.weight_volume,
+        name = EXCLUDED.name,
+        image_url = EXCLUDED.image_url,
+        product_url = EXCLUDED.product_url`,
       [
         product.id,
         product.retailer_id,
@@ -73,11 +32,11 @@ async function saveProduct(productData) {
     );
 
     // Insertar el nuevo precio
-    await database.run(
+    await query(
       `INSERT INTO prices (
         id, product_id, retailer_id, original_price, discount_percentage,
         discounted_price, price_per_unit, discount_conditions, date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_DATE)`,
       [
         `${price.product_id}_${Date.now()}`,
         price.product_id,
@@ -91,7 +50,6 @@ async function saveProduct(productData) {
     );
 
     console.log(`Producto guardado exitosamente: ${product.id}`);
-    console.log(`Precio guardado exitosamente: ${price.product_id}`);
   } catch (error) {
     console.error('Error al guardar en la base de datos:', error);
     throw error;
@@ -99,21 +57,21 @@ async function saveProduct(productData) {
 }
 
 async function getRetailer(id) {
-  const database = await initializeDatabase();
-  return database.get('SELECT * FROM retailers WHERE id = ?', [id]);
+  const result = await query('SELECT * FROM retailers WHERE id = $1', [id]);
+  return result.rows[0];
 }
 
 async function getProduct(id) {
-  const database = await initializeDatabase();
-  return database.get('SELECT * FROM products WHERE id = ?', [id]);
+  const result = await query('SELECT * FROM products WHERE id = $1', [id]);
+  return result.rows[0];
 }
 
 async function getLatestPrice(productId) {
-  const database = await initializeDatabase();
-  return database.get(
-    'SELECT * FROM prices WHERE product_id = ? ORDER BY date DESC LIMIT 1',
+  const result = await query(
+    'SELECT * FROM prices WHERE product_id = $1 ORDER BY date DESC LIMIT 1',
     [productId]
   );
+  return result.rows[0];
 }
 
 module.exports = {

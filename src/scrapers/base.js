@@ -88,9 +88,9 @@ class BaseScraper {
   }
 
   async startScraping() {
+    console.log('Launching browser...');
     const browser = await puppeteer.launch({ 
-      headless: 'new',
-      executablePath: '/nix/store/chromium/bin/chromium',
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -106,10 +106,18 @@ class BaseScraper {
     });
 
     try {
+      console.log('Creating new page...');
       const page = await browser.newPage();
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+      console.log('Starting category scraping...');
       await this.scrapeCategoryPages(page);
+
+      console.log('Starting product scraping...');
       await this.scrapeProducts(browser);
+    } catch (error) {
+      console.error('Error during scraping:', error);
+      throw error;
     } finally {
       await browser.close();
     }
