@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Administrar Programas</title>
+  <meta name="description" content="Panel para completar y publicar el programa semanal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="acceso" class="login-wrap" hidden>
+    <form id="form-acceso" class="card login" autocomplete="on">
+      <h1>Acceso</h1>
+      <label>Usuario
+        <input type="text" id="acceso-usuario" autocomplete="username" required>
+      </label>
+      <label>Clave
+        <input type="password" id="acceso-clave" autocomplete="current-password" required>
+      </label>
+      <p id="acceso-error" class="error" role="alert"></p>
+      <button type="submit" class="btn primary full">Entrar</button>
+      <a class="hint centrado" href="index.html">← Ver programas publicados</a>
+    </form>
+  </section>
+
+  <div id="panel" hidden>
+    <header class="topbar">
+      <h1>Administrar</h1>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="index.html">Ver publicados</a>
+        <button type="button" class="btn primary" data-action="descargar">Descargar imagen</button>
+        <button type="button" class="btn" data-action="compartir" id="btn-compartir" hidden>Compartir</button>
+        <button type="button" class="btn ghost" id="btn-salir">Salir</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel form-panel" aria-label="Planilla">
+        <form id="planilla" autocomplete="off" onsubmit="return false">
+          <fieldset class="card">
+            <legend>Publicación</legend>
+            <div class="row-actions">
+              <button type="button" class="btn primary" data-pub="publicar" id="btn-publicar">Publicar esta semana</button>
+            </div>
+            <p id="pub-estado" class="hint" role="status"></p>
+            <h3 class="sub">Publicados</h3>
+            <div id="pub-lista" class="pub-lista"><p class="hint">Cargando…</p></div>
+            <div class="row-actions">
+              <button type="button" class="btn ghost small" data-pub="refrescar">Actualizar lista</button>
+            </div>
+          </fieldset>
+
+          <details class="card" id="card-token">
+            <summary>Conexión con GitHub (necesaria para publicar)</summary>
+            <label>Token de acceso
+              <input type="password" id="token" autocomplete="off" placeholder="github_pat_…">
+            </label>
+            <div class="row-actions">
+              <button type="button" class="btn" data-pub="guardar-token">Guardar y probar</button>
+              <button type="button" class="btn ghost danger" data-pub="quitar-token">Quitar token</button>
+            </div>
+            <p id="token-estado" class="hint" role="status"></p>
+            <ol class="hint pasos">
+              <li>En GitHub: <em>Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</em>.</li>
+              <li><em>Repository access:</em> solo <strong>WebDataHarvester</strong>.</li>
+              <li><em>Permissions → Repository → Contents:</em> <strong>Read and write</strong>.</li>
+              <li>Pegalo acá. Queda guardado solo en este navegador.</li>
+            </ol>
+          </details>
+
+          <fieldset class="card">
+            <legend>Semana</legend>
+            <div class="grid-2">
+              <label>Lunes de la semana
+                <input type="date" data-path="semana">
+              </label>
+              <label>Texto de la fecha
+                <input type="text" data-path="fecha" placeholder="30-6 de diciembre">
+              </label>
+            </div>
+            <label>Título
+              <input type="text" data-path="titulo">
+            </label>
+            <div class="grid-2">
+              <label>Presidente
+                <input type="text" data-path="presidente" list="nombres" class="nombre">
+              </label>
+              <label>Oración inicial
+                <input type="text" data-path="oracionInicio" list="nombres" class="nombre">
+              </label>
+            </div>
+            <label>Palabras de introducción
+              <input type="text" data-path="introduccion">
+            </label>
+          </fieldset>
+
+          <div id="secciones"></div>
+          <button type="button" class="btn ghost full" data-action="agregar-seccion">+ Agregar sección</button>
+
+          <fieldset class="card">
+            <legend>Cierre</legend>
+            <label>Palabras de conclusión
+              <input type="text" data-path="conclusion">
+            </label>
+            <label>Oración final
+              <input type="text" data-path="oracionFinal" list="nombres" class="nombre">
+            </label>
+          </fieldset>
+
+          <fieldset class="card">
+            <legend>Borradores en este navegador</legend>
+            <div class="row-actions">
+              <select id="guardados" aria-label="Borradores guardados"></select>
+              <button type="button" class="btn" data-action="cargar">Cargar</button>
+              <button type="button" class="btn danger" data-action="borrar-guardado">Borrar</button>
+            </div>
+            <div class="row-actions">
+              <button type="button" class="btn" data-action="guardar">Guardar borrador</button>
+              <button type="button" class="btn" data-action="nueva-semana">Nueva semana →</button>
+            </div>
+            <div class="row-actions">
+              <button type="button" class="btn ghost" data-action="exportar">Exportar respaldo</button>
+              <label class="btn ghost file-btn">Importar respaldo
+                <input type="file" accept="application/json,.json" id="importar" hidden>
+              </label>
+              <button type="button" class="btn ghost danger" data-action="reiniciar">Restaurar modelo</button>
+            </div>
+            <p class="hint">Los cambios se guardan solos en este navegador, pero no se ven públicamente hasta que toques “Publicar”. “Nueva semana” avanza 7 días y deja las partes, pero vacía los nombres.</p>
+          </fieldset>
+
+          <details class="card">
+            <summary>Lista de nombres para autocompletar</summary>
+            <p class="hint">Uno por línea. Los nombres nuevos que escribas en la planilla se agregan solos.</p>
+            <textarea id="lista-nombres" rows="10"></textarea>
+          </details>
+        </form>
+        <datalist id="nombres"></datalist>
+      </section>
+
+      <section class="panel preview-panel" aria-label="Vista previa">
+        <div class="preview-sticky">
+          <canvas id="lienzo" width="1240" height="1600"></canvas>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+  <script src="publicar.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

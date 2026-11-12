@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Programa Semanal</title>
-  <meta name="description" content="Completá la planilla y generá la imagen del programa semanal.">
+  <title>Programas Publicados</title>
+  <meta name="description" content="Programas semanales publicados.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -12,93 +12,32 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>Programa Semanal</h1>
-    <div class="topbar-actions">
-      <button type="button" class="btn primary" data-action="descargar">Descargar imagen</button>
-      <button type="button" class="btn" data-action="compartir" id="btn-compartir" hidden>Compartir</button>
-    </div>
+    <h1>Programas Publicados</h1>
+    <a class="btn ghost" href="admin.html">Administrar</a>
   </header>
 
-  <main class="layout">
-    <section class="panel form-panel" aria-label="Planilla">
-      <form id="planilla" autocomplete="off" onsubmit="return false">
-        <fieldset class="card">
-          <legend>Semana</legend>
-          <div class="grid-2">
-            <label>Lunes de la semana
-              <input type="date" data-path="semana">
-            </label>
-            <label>Texto de la fecha
-              <input type="text" data-path="fecha" placeholder="30-6 de diciembre">
-            </label>
-          </div>
-          <label>Título
-            <input type="text" data-path="titulo">
-          </label>
-          <div class="grid-2">
-            <label>Presidente
-              <input type="text" data-path="presidente" list="nombres" class="nombre">
-            </label>
-            <label>Oración inicial
-              <input type="text" data-path="oracionInicio" list="nombres" class="nombre">
-            </label>
-          </div>
-          <label>Palabras de introducción
-            <input type="text" data-path="introduccion">
-          </label>
-        </fieldset>
-
-        <div id="secciones"></div>
-        <button type="button" class="btn ghost full" data-action="agregar-seccion">+ Agregar sección</button>
-
-        <fieldset class="card">
-          <legend>Cierre</legend>
-          <label>Palabras de conclusión
-            <input type="text" data-path="conclusion">
-          </label>
-          <label>Oración final
-            <input type="text" data-path="oracionFinal" list="nombres" class="nombre">
-          </label>
-        </fieldset>
-
-        <fieldset class="card">
-          <legend>Programas guardados</legend>
-          <div class="row-actions">
-            <select id="guardados" aria-label="Programas guardados"></select>
-            <button type="button" class="btn" data-action="cargar">Cargar</button>
-            <button type="button" class="btn danger" data-action="borrar-guardado">Borrar</button>
-          </div>
-          <div class="row-actions">
-            <button type="button" class="btn" data-action="guardar">Guardar esta semana</button>
-            <button type="button" class="btn" data-action="nueva-semana">Nueva semana →</button>
-          </div>
-          <div class="row-actions">
-            <button type="button" class="btn ghost" data-action="exportar">Exportar respaldo</button>
-            <label class="btn ghost file-btn">Importar respaldo
-              <input type="file" accept="application/json,.json" id="importar" hidden>
-            </label>
-            <button type="button" class="btn ghost danger" data-action="reiniciar">Restaurar modelo</button>
-          </div>
-          <p class="hint">Todo se guarda automáticamente en este navegador. “Nueva semana” avanza 7 días y deja las partes, pero vacía los nombres.</p>
-        </fieldset>
-
-        <details class="card">
-          <summary>Lista de nombres para autocompletar</summary>
-          <p class="hint">Uno por línea. Los nombres nuevos que escribas en la planilla se agregan solos.</p>
-          <textarea id="lista-nombres" rows="10"></textarea>
-        </details>
-      </form>
-      <datalist id="nombres"></datalist>
+  <main class="galeria-wrap">
+    <p id="estado-galeria" class="hint centrado">Cargando…</p>
+    <section id="destacado" class="destacado" hidden>
+      <h2>Esta semana</h2>
+      <div id="destacado-card"></div>
     </section>
-
-    <section class="panel preview-panel" aria-label="Vista previa">
-      <div class="preview-sticky">
-        <canvas id="lienzo" width="1240" height="1600"></canvas>
-      </div>
-    </section>
+    <h2 id="titulo-anteriores" hidden>Todos los programas</h2>
+    <div id="galeria" class="galeria"></div>
   </main>
 
-  <div id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <dialog id="visor">
+    <form method="dialog" class="visor-barra">
+      <strong id="visor-titulo"></strong>
+      <span class="visor-acciones">
+        <a class="btn primary" id="visor-descargar" download>Descargar</a>
+        <button class="btn">Cerrar</button>
+      </span>
+    </form>
+    <img id="visor-img" alt="">
+  </dialog>
+
+  <script src="config.js"></script>
+  <script src="galeria.js"></script>
 </body>
 </html>
