@@ -1,0 +1,568 @@
+'use strict';
+
+/* ---------- Datos por defecto ---------- */
+
+const KEY_ESTADO = 'programa-semanal:estado:v1';
+const KEY_NOMBRES = 'programa-semanal:nombres:v1';
+const KEY_GUARDADOS = 'programa-semanal:guardados:v1';
+
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+  'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+const fila = (texto, nombre1 = '', nombre2 = '', etiqueta = '') => ({ texto, etiqueta, nombre1, nombre2 });
+
+const MODELO = {
+  semana: '2024-12-30',
+  fecha: '30-6 de diciembre',
+  titulo: 'LECTURA SEMANAL DE LA BIBLIA',
+  presidente: 'Jorge Johansson',
+  oracionInicio: 'Jorge Johansson',
+  introduccion: 'Palabras de introducción (1 min).',
+  secciones: [
+    {
+      titulo: 'TESOROS DE LA BIBLIA', color: '#575a5d',
+      filas: [
+        fila('1. Avancemos al ritmo del carro celestial de Jehová (10 mins).', 'Marcelo Massan'),
+        fila('2. Busquemos perlas escondidas (10 mins).', 'Javier Laffargue'),
+        fila('3. Lectura de la Biblia (4 mins).', 'Matías Vazquez', '', 'Estudiante:'),
+      ],
+    },
+    {
+      titulo: 'SEAMOS MEJORES MAESTROS', color: '#c18f00',
+      filas: [
+        fila('4. Empecemos conversaciones (3 mins).', 'Franco Vasquez', 'Manuel Viñas'),
+        fila('5. Hagamos discípulos (5 mins).', 'Claudia Peralta', 'Erika Staltari'),
+        fila('7. Discurso (4 mins).', 'Antonio Borel'),
+      ],
+    },
+    {
+      titulo: 'NUESTRA VIDA CRISTIANA', color: '#7d0022',
+      filas: [
+        fila('8. Visita del superintendente', 'Sebastián Nicolini'),
+      ],
+    },
+  ],
+  conclusion: 'Palabras de conclusión (3 min.)',
+  oracionFinal: 'Hugo Longhi',
+};
+
+const NOMBRES_INICIALES = ['Antonio Borel', 'Claudia Peralta', 'Erika Staltari', 'Franco Vasquez',
+  'Hugo Longhi', 'Javier Laffargue', 'Jorge Johansson', 'Manuel Viñas', 'Marcelo Massan',
+  'Matías Vazquez', 'Sebastián Nicolini'];
+
+/* ---------- Utilidades ---------- */
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const clonar = (o) => JSON.parse(JSON.stringify(o));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function leer(key, def) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
+}
+function escribir(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* sin almacenamiento */ }
+}
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function getPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+}
+function setPath(obj, path, val) {
+  const keys = path.split('.');
+  const last = keys.pop();
+  const target = keys.reduce((o, k) => o[k], obj);
+  target[last] = val;
+}
+
+function fechaDesdeISO(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+function aISO(date) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+}
+function textoSemana(iso) {
+  if (!iso) return '';
+  const ini = fechaDesdeISO(iso);
+  const fin = new Date(ini); fin.setDate(fin.getDate() + 6);
+  if (ini.getMonth() === fin.getMonth()) {
+    return `${ini.getDate()}-${fin.getDate()} de ${MESES[ini.getMonth()]}`;
+  }
+  return `${ini.getDate()} de ${MESES[ini.getMonth()]} - ${fin.getDate()} de ${MESES[fin.getMonth()]}`;
+}
+
+/* ---------- Estado ---------- */
+
+let estado = leer(KEY_ESTADO, null) || clonar(MODELO);
+let nombres = new Set(leer(KEY_NOMBRES, NOMBRES_INICIALES));
+
+function guardarEstado() { escribir(KEY_ESTADO, estado); }
+
+function guardarNombres() {
+  const lista = [...nombres].filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'));
+  nombres = new Set(lista);
+  escribir(KEY_NOMBRES, lista);
+  $('#nombres').innerHTML = lista.map((n) => `<option value="${esc(n)}">`).join('');
+  if (document.activeElement !== $('#lista-nombres')) $('#lista-nombres').value = lista.join('\n');
+}
+
+/* ---------- Formulario ---------- */
+
+function htmlSeccion(sec, si) {
+  const filas = sec.filas.map((f, fi) => {
+    const p = `secciones.${si}.filas.${fi}`;
+    return `
+      <div class="fila">
+        <div class="fila-grid">
+          <label class="wide">Parte
+            <input type="text" data-path="${p}.texto" value="${esc(f.texto)}">
+          </label>
+          <label>Etiqueta (opcional)
+            <input type="text" data-path="${p}.etiqueta" value="${esc(f.etiqueta)}" placeholder="Ej.: Estudiante:">
+          </label>
+          <label>Nombre
+            <input type="text" class="nombre" list="nombres" data-path="${p}.nombre1" value="${esc(f.nombre1)}">
+          </label>
+          <label>Ayudante (opcional)
+            <input type="text" class="nombre" list="nombres" data-path="${p}.nombre2" value="${esc(f.nombre2)}">
+          </label>
+        </div>
+        <div class="fila-tools">
+          <button type="button" class="btn small" data-action="subir-fila" data-s="${si}" data-f="${fi}" title="Subir" aria-label="Subir parte">↑</button>
+          <button type="button" class="btn small" data-action="bajar-fila" data-s="${si}" data-f="${fi}" title="Bajar" aria-label="Bajar parte">↓</button>
+          <button type="button" class="btn small danger" data-action="quitar-fila" data-s="${si}" data-f="${fi}">Quitar</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <fieldset class="card" style="--section-color:${esc(sec.color)}">
+      <div class="section-head">
+        <label>Sección
+          <input type="text" data-path="secciones.${si}.titulo" value="${esc(sec.titulo)}">
+        </label>
+        <label class="color-label">Color
+          <input type="color" data-path="secciones.${si}.color" value="${esc(sec.color)}">
+        </label>
+        <button type="button" class="btn small" data-action="subir-seccion" data-s="${si}" aria-label="Subir sección">↑</button>
+        <button type="button" class="btn small" data-action="bajar-seccion" data-s="${si}" aria-label="Bajar sección">↓</button>
+        <button type="button" class="btn small danger" data-action="quitar-seccion" data-s="${si}">Quitar</button>
+      </div>
+      ${filas}
+      <button type="button" class="btn ghost small" data-action="agregar-fila" data-s="${si}">+ Agregar parte</button>
+    </fieldset>`;
+}
+
+function renderFormulario() {
+  $('#secciones').innerHTML = estado.secciones.map(htmlSeccion).join('');
+  document.querySelectorAll('#planilla [data-path]').forEach((el) => {
+    const v = getPath(estado, el.dataset.path);
+    if (el.value !== (v ?? '')) el.value = v ?? '';
+  });
+}
+
+function renderGuardados() {
+  const guardados = leer(KEY_GUARDADOS, {});
+  const claves = Object.keys(guardados).sort().reverse();
+  $('#guardados').innerHTML = claves.length
+    ? claves.map((k) => `<option value="${esc(k)}">${esc(guardados[k].fecha || k)}</option>`).join('')
+    : '<option value="">(no hay programas guardados)</option>';
+}
+
+function cambio() {
+  guardarEstado();
+  programarDibujo();
+}
+
+function mover(arr, i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+}
+
+const acciones = {
+  'agregar-seccion'() {
+    estado.secciones.push({ titulo: 'NUEVA SECCIÓN', color: '#575a5d', filas: [fila('')] });
+  },
+  'quitar-seccion'(d) {
+    if (confirm('¿Quitar esta sección completa?')) estado.secciones.splice(d.s, 1);
+  },
+  'subir-seccion'(d) { mover(estado.secciones, +d.s, -1); },
+  'bajar-seccion'(d) { mover(estado.secciones, +d.s, 1); },
+  'agregar-fila'(d) { estado.secciones[d.s].filas.push(fila('')); },
+  'quitar-fila'(d) { estado.secciones[d.s].filas.splice(d.f, 1); },
+  'subir-fila'(d) { mover(estado.secciones[d.s].filas, +d.f, -1); },
+  'bajar-fila'(d) { mover(estado.secciones[d.s].filas, +d.f, 1); },
+
+  guardar() {
+    const guardados = leer(KEY_GUARDADOS, {});
+    const clave = estado.semana || estado.fecha || new Date().toISOString();
+    guardados[clave] = clonar(estado);
+    escribir(KEY_GUARDADOS, guardados);
+    renderGuardados();
+    $('#guardados').value = clave;
+    toast('Semana guardada');
+    return false;
+  },
+  cargar() {
+    const clave = $('#guardados').value;
+    const g = leer(KEY_GUARDADOS, {})[clave];
+    if (!g) return false;
+    estado = clonar(g);
+    toast('Programa cargado');
+  },
+  'borrar-guardado'() {
+    const clave = $('#guardados').value;
+    const guardados = leer(KEY_GUARDADOS, {});
+    if (!guardados[clave] || !confirm(`¿Borrar el programa "${guardados[clave].fecha || clave}"?`)) return false;
+    delete guardados[clave];
+    escribir(KEY_GUARDADOS, guardados);
+    renderGuardados();
+    return false;
+  },
+  'nueva-semana'() {
+    if (!confirm('Se guarda la semana actual y se arma la siguiente con los nombres vacíos. ¿Seguir?')) return false;
+    acciones.guardar();
+    const base = estado.semana ? fechaDesdeISO(estado.semana) : new Date();
+    base.setDate(base.getDate() + 7);
+    estado.semana = aISO(base);
+    estado.fecha = textoSemana(estado.semana);
+    estado.presidente = estado.oracionInicio = estado.oracionFinal = '';
+    estado.secciones.forEach((s) => s.filas.forEach((f) => { f.nombre1 = ''; f.nombre2 = ''; }));
+    toast('Nueva semana lista para completar');
+  },
+  exportar() {
+    const datos = { estado, nombres: [...nombres], guardados: leer(KEY_GUARDADOS, {}) };
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    descargarBlob(blob, `programa-semanal-respaldo-${aISO(new Date())}.json`);
+    return false;
+  },
+  reiniciar() {
+    if (!confirm('¿Reemplazar la planilla actual por el modelo original?')) return false;
+    estado = clonar(MODELO);
+  },
+  async descargar() {
+    const blob = await generarBlob();
+    descargarBlob(blob, nombreArchivo());
+    return false;
+  },
+  async compartir() {
+    const blob = await generarBlob();
+    const archivo = new File([blob], nombreArchivo(), { type: 'image/png' });
+    try {
+      await navigator.share({ files: [archivo], title: `Programa ${estado.fecha}` });
+    } catch (e) {
+      if (e.name !== 'AbortError') descargarBlob(blob, archivo.name);
+    }
+    return false;
+  },
+};
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const r = await acciones[btn.dataset.action]?.(btn.dataset);
+  if (r === false) return;
+  renderFormulario();
+  cambio();
+});
+
+$('#planilla').addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.id === 'lista-nombres') {
+    nombres = new Set(el.value.split('\n').map((s) => s.trim()).filter(Boolean));
+    guardarNombres();
+    return;
+  }
+  const path = el.dataset.path;
+  if (!path) return;
+  setPath(estado, path, el.value);
+  if (path === 'semana') {
+    estado.fecha = textoSemana(el.value);
+    $('[data-path="fecha"]').value = estado.fecha;
+  }
+  if (path.endsWith('.color')) el.closest('fieldset').style.setProperty('--section-color', el.value);
+  cambio();
+});
+
+$('#planilla').addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.classList.contains('nombre') && el.value.trim() && !nombres.has(el.value.trim())) {
+    nombres.add(el.value.trim());
+    guardarNombres();
+  }
+});
+
+$('#importar').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const datos = JSON.parse(await file.text());
+    if (datos.estado?.secciones) estado = datos.estado;
+    else if (datos.secciones) estado = datos;
+    else throw new Error('formato');
+    if (Array.isArray(datos.nombres)) datos.nombres.forEach((n) => nombres.add(n));
+    if (datos.guardados) escribir(KEY_GUARDADOS, { ...leer(KEY_GUARDADOS, {}), ...datos.guardados });
+    guardarNombres();
+    renderGuardados();
+    renderFormulario();
+    cambio();
+    toast('Respaldo importado');
+  } catch {
+    toast('El archivo no es un respaldo válido');
+  }
+});
+
+/* ---------- Imagen ---------- */
+
+const W = 1240;
+const H_BASE = 1600;
+const LINEA_SUP = 150;
+const LINEA_INF_BASE = 1322;
+const MARGEN_INF = H_BASE - LINEA_INF_BASE;
+const X_TEXTO = 125;
+const ANCHO_TEXTO = 480;
+const ALTO_LINEA = 30;
+const X_ETIQ = 785;
+const X_NOMBRE = 805;
+const X_NOMBRE_A = 680;
+const X_NOMBRE_B = 870;
+
+const F = {
+  fecha: '500 23px Montserrat',
+  titulo: '700 21px Montserrat',
+  etiqueta: '500 15px Montserrat',
+  barra: '700 19px Montserrat',
+  texto: '400 22px Roboto',
+  nombre: (px) => `400 ${px}px Roboto`,
+};
+
+const fuentesListas = Promise.all([
+  '500 23px Montserrat', '700 21px Montserrat', '500 15px Montserrat', '400 22px Roboto',
+].map((f) => document.fonts.load(f))).catch(() => {});
+
+function partirLineas(ctx, texto, anchoPrimera, anchoResto = anchoPrimera) {
+  const palabras = String(texto || '').split(/\s+/).filter(Boolean);
+  const lineas = [];
+  let actual = '';
+  for (const p of palabras) {
+    const prueba = actual ? `${actual} ${p}` : p;
+    const max = lineas.length === 0 ? anchoPrimera : anchoResto;
+    if (actual && ctx.measureText(prueba).width > max) {
+      lineas.push(actual);
+      actual = p;
+    } else {
+      actual = prueba;
+    }
+  }
+  if (actual) lineas.push(actual);
+  return lineas.length ? lineas : [''];
+}
+
+function letterSpacing(ctx, v) {
+  if ('letterSpacing' in ctx) ctx.letterSpacing = v;
+}
+
+function textoAjustado(ctx, texto, x, y, anchoMax, px = 22) {
+  let size = px;
+  ctx.font = F.nombre(size);
+  while (size > 13 && ctx.measureText(texto).width > anchoMax) {
+    size -= 1;
+    ctx.font = F.nombre(size);
+  }
+  ctx.fillText(texto, x, y);
+}
+
+/** Calcula posiciones y dibuja. Devuelve el alto usado. */
+function componer(ctx, s, dibujar) {
+  ctx.textBaseline = 'middle';
+
+  // Encabezado
+  const yHead = LINEA_SUP + 47;
+  ctx.font = F.fecha;
+  const fechaTxt = s.fecha ? `${s.fecha} |` : '';
+  const anchoFecha = fechaTxt ? ctx.measureText(fechaTxt).width + 22 : 0;
+  ctx.font = F.titulo;
+  letterSpacing(ctx, '1.5px');
+  const xTitulo = 92 + anchoFecha;
+  const lineasTitulo = partirLineas(ctx, s.titulo, 630 - xTitulo, 630 - 145);
+  letterSpacing(ctx, '0px');
+  const yOracionIni = yHead + 64;
+  const yIntro = Math.max(yOracionIni + 30, yHead + (lineasTitulo.length - 1) * 28 + 50);
+  const altoEncabezado = yIntro + 15 - LINEA_SUP;
+
+  // Medir filas
+  ctx.font = F.texto;
+  const secciones = s.secciones.map((sec) => ({
+    ...sec,
+    filas: sec.filas.map((f) => {
+      const lineas = partirLineas(ctx, f.texto, ANCHO_TEXTO);
+      return { ...f, lineas, alto: Math.max(lineas.length, 1) * ALTO_LINEA };
+    }),
+  }));
+
+  // Alturas fijas y pesos de los espacios flexibles
+  const ALTO_BARRA = 28;
+  let fijo = altoEncabezado + ALTO_LINEA /* conclusión */ + ALTO_LINEA /* oración */;
+  let pesos = 1.6 + 1.3 + 1.0;
+  for (const sec of secciones) {
+    fijo += ALTO_BARRA;
+    pesos += 1.0 + 0.9;
+    sec.filas.forEach((f, i) => { fijo += f.alto; if (i > 0) pesos += 1.0; });
+  }
+  const disponible = LINEA_INF_BASE - LINEA_SUP;
+  const G = Math.min(72, Math.max(22, (disponible - fijo) / pesos));
+  const lineaInf = Math.max(LINEA_INF_BASE, Math.ceil(LINEA_SUP + fijo + pesos * G));
+  const alto = lineaInf + MARGEN_INF;
+  if (!dibujar) return alto;
+
+  // Fondo y líneas
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, alto);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(62, LINEA_SUP, 990, 6);
+  ctx.fillRect(62, lineaInf, 990, 6);
+
+  // Encabezado izquierda
+  ctx.fillStyle = '#1a1a1a';
+  ctx.textAlign = 'left';
+  if (fechaTxt) { ctx.font = F.fecha; ctx.fillText(fechaTxt, 92, yHead + 1); }
+  ctx.font = F.titulo;
+  letterSpacing(ctx, '1.5px');
+  lineasTitulo.forEach((l, i) => ctx.fillText(l, i === 0 ? xTitulo : 145, yHead + i * 28));
+  letterSpacing(ctx, '0px');
+
+  // Encabezado derecha
+  etiquetaNombre(ctx, 'Presidente:', s.presidente, yHead);
+  etiquetaNombre(ctx, 'Oración:', s.oracionInicio, yOracionIni);
+
+  // Introducción
+  vineta(ctx, '#575a5d', s.introduccion, yIntro);
+
+  // Secciones
+  let y = yIntro + 15;
+  for (const sec of secciones) {
+    y += G;
+    ctx.fillStyle = sec.color || '#575a5d';
+    ctx.fillRect(X_TEXTO, y, 510, ALTO_BARRA);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = F.barra;
+    letterSpacing(ctx, '-0.3px');
+    ctx.fillText(sec.titulo || '', X_TEXTO + 11, y + ALTO_BARRA / 2 + 1);
+    letterSpacing(ctx, '0px');
+    y += ALTO_BARRA + G * 0.9;
+
+    sec.filas.forEach((f, i) => {
+      if (i > 0) y += G;
+      const yPrimera = y + ALTO_LINEA / 2;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = F.texto;
+      ctx.textAlign = 'left';
+      f.lineas.forEach((l, li) => ctx.fillText(l, X_TEXTO, yPrimera + li * ALTO_LINEA));
+      if (f.nombre2) {
+        if (f.etiqueta) etiqueta(ctx, f.etiqueta, X_NOMBRE_A - 14, yPrimera);
+        ctx.fillStyle = '#1a1a1a';
+        textoAjustado(ctx, f.nombre1 || '', X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 16);
+        textoAjustado(ctx, f.nombre2, X_NOMBRE_B, yPrimera, W - X_NOMBRE_B - 30);
+      } else {
+        etiquetaNombre(ctx, f.etiqueta, f.nombre1, yPrimera);
+      }
+      y += f.alto;
+    });
+  }
+
+  // Cierre
+  y += G * 1.6;
+  vineta(ctx, '#7d0022', s.conclusion, y + ALTO_LINEA / 2);
+  y += ALTO_LINEA + G * 1.3;
+  etiquetaNombre(ctx, 'Oración:', s.oracionFinal, y + ALTO_LINEA / 2);
+  return alto;
+}
+
+function etiqueta(ctx, texto, xDer, y) {
+  ctx.font = F.etiqueta;
+  ctx.fillStyle = '#3a3a3a';
+  ctx.textAlign = 'right';
+  ctx.fillText(texto, xDer, y + 1);
+  ctx.textAlign = 'left';
+}
+
+function etiquetaNombre(ctx, etiq, nombre, y) {
+  if (etiq) etiqueta(ctx, etiq, X_ETIQ, y);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.textAlign = 'left';
+  textoAjustado(ctx, nombre || '', X_NOMBRE, y, W - X_NOMBRE - 30);
+}
+
+function vineta(ctx, color, texto, y) {
+  if (!texto) return;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(167, y, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = F.texto;
+  ctx.textAlign = 'left';
+  ctx.fillText(texto, 179, y);
+}
+
+async function dibujar() {
+  await fuentesListas;
+  const canvas = $('#lienzo');
+  const ctx = canvas.getContext('2d');
+  const alto = componer(ctx, estado, false);
+  if (canvas.height !== alto) canvas.height = alto;
+  componer(ctx, estado, true);
+}
+
+let pendiente = false;
+function programarDibujo() {
+  if (pendiente) return;
+  pendiente = true;
+  requestAnimationFrame(() => { pendiente = false; dibujar(); });
+}
+
+async function generarBlob() {
+  await dibujar();
+  return new Promise((res) => $('#lienzo').toBlob(res, 'image/png'));
+}
+
+function nombreArchivo() {
+  const base = (estado.fecha || 'programa').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+  return `programa-${base || 'semanal'}.png`;
+}
+
+function descargarBlob(blob, nombre) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ---------- Inicio ---------- */
+
+try {
+  const prueba = new File([''], 'x.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [prueba] })) $('#btn-compartir').hidden = false;
+} catch { /* sin soporte */ }
+
+guardarNombres();
+renderGuardados();
+renderFormulario();
+dibujar();
+document.fonts.addEventListener?.('loadingdone', programarDibujo);
