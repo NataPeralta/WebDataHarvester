@@ -16,14 +16,14 @@ No usa servidor, base de datos ni paso de compilación: los archivos de `docs/` 
 | **Fin de semana y asignaciones** | Dos bloques opcionales dentro de la misma imagen, debajo de un divisor horizontal: *Reunión del fin de semana* (discursante, conductor de La Atalaya, lector) y *Asignaciones* (microfonista, sonido, zoom, acomodadores, puerta). Cada uno se activa o desactiva con una casilla. |
 | **Vista previa en vivo** | La imagen se dibuja en un `<canvas>` y se actualiza con cada cambio. |
 | **Descargar / compartir** | Exporta la imagen como PNG. En celulares compatibles aparece "Compartir". |
-| **Semanas guardadas** | Se guardan en el navegador, con respaldo exportable e importable en JSON. |
+| **Sin guardado manual** | No hay programas guardados ni respaldos: se completa la planilla, se descarga la imagen y listo. La planilla en curso se recuerda sola en el navegador y "Nueva semana →" la deja lista para la semana siguiente. |
 
 ## 2. Estructura de archivos
 
 ```
 docs/
 ├── index.html    Planilla y vista previa
-├── app.js        Datos, formulario, dibujo de la imagen, semanas guardadas
+├── app.js        Datos, formulario, dibujo de la imagen
 ├── styles.css    Estilos (claro/oscuro automático)
 └── .nojekyll     Evita que GitHub procese el sitio con Jekyll
 ```
@@ -32,12 +32,12 @@ docs/
 
 - `app.js` mantiene un objeto `estado` con todos los datos y lo redibuja en el canvas (1240 px de ancho; el alto crece si hay más partes).
 - Las posiciones y tipografías están en las constantes y en `componer()`. Se usan Montserrat y Roboto desde Google Fonts.
-- La planilla arranca en blanco, con la semana actual. No trae ningún nombre.
+- La planilla arranca en blanco, con la semana actual. No trae ningún nombre. El programa termina en la última sección: no hay palabras de conclusión ni oración final.
 - Al elegir el lunes de la semana, el texto de la fecha se genera solo ("30-6 de diciembre"). Se puede corregir a mano.
 - Se pueden agregar, quitar y reordenar partes y secciones, y cambiar el color de cada sección.
 - **Bloques opcionales:** si alguno está activo, la línea negra que cerraba el programa pasa a ser el divisor, los bloques se dibujan debajo y otra línea cierra la imagen. Si no hay ninguno activo, la imagen queda igual que antes. Se puede cambiar el título y el color de cada barra, y agregar, quitar y reordenar las filas. Cada fila admite un segundo nombre (por ejemplo, dos acomodadores).
 - Los datos guardados antes de que existieran estos bloques se completan solos al abrirlos.
-- **"Nueva semana →"** guarda la actual, avanza 7 días y deja las partes, pero vacía los nombres (también los del fin de semana y las asignaciones).
+- **"Nueva semana →"** (al final de la planilla) avanza 7 días y deja las partes, pero vacía los nombres (también los del fin de semana y las asignaciones).
 
 ## 4. Puesta en marcha
 
@@ -56,15 +56,14 @@ python3 -m http.server -d docs 8000
 |---|---|
 | `programa-semanal:estado:v1` | Planilla actual (se guarda sola). |
 | `programa-semanal:nombres:v1` | Lista de nombres para autocompletar. |
-| `programa-semanal:guardados:v1` | Semanas guardadas. |
 
 Son locales a cada navegador.
 
 ### Autocompletado por dispositivo
 - El código del sitio no trae ninguna lista de nombres: arranca vacía en cada dispositivo.
-- Cada nombre que se escribe en la planilla se agrega a la lista de ese dispositivo. También se aprenden los nombres de la planilla actual y de las semanas guardadas.
+- Cada nombre que se escribe en la planilla se agrega a la lista de ese dispositivo. También se aprenden los nombres de la planilla actual.
 - La lista se puede editar a mano en "Lista de nombres para autocompletar".
-- Un nombre cargado en un dispositivo no aparece en otro. Para copiar los nombres a otro dispositivo: **Exportar respaldo** en uno e **Importar respaldo** en el otro (archivo JSON).
+- Un nombre cargado en un dispositivo no aparece en otro. Para llevarlos a otro dispositivo hay que copiar la lista a mano desde "Lista de nombres para autocompletar".
 
 ## 6. Privacidad
 
@@ -78,4 +77,4 @@ Son locales a cada navegador.
 |---|---|
 | Se ve la versión vieja del sitio | Pages tarda uno o dos minutos; recargar con Ctrl+F5. |
 | 404 en el sitio | En *Settings → Pages* la carpeta debe ser `/docs`, no `/ (root)`. |
-| Perdí mis semanas guardadas | Se guardan por navegador; usar otro navegador o borrar datos del sitio las elimina. Conviene exportar un respaldo. |
+| Se borró la planilla en curso | Se recuerda por navegador; usar otro navegador o borrar los datos del sitio la elimina. Lo que importa es descargar la imagen. |

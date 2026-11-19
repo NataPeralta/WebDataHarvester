@@ -4,7 +4,6 @@
 
 const KEY_ESTADO = 'programa-semanal:estado:v1';
 const KEY_NOMBRES = 'programa-semanal:nombres:v1';
-const KEY_GUARDADOS = 'programa-semanal:guardados:v1';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -44,8 +43,6 @@ const MODELO = {
       ],
     },
   ],
-  conclusion: 'Palabras de conclusión (3 min.)',
-  oracionFinal: '',
 };
 
 // Bloques opcionales que van debajo de un divisor horizontal, dentro de la misma imagen.
@@ -139,13 +136,12 @@ let estado = normalizar(leer(KEY_ESTADO, null) || clonar(MODELO));
 let nombres = new Set(leer(KEY_NOMBRES, []));
 
 function recolectarNombres(s) {
-  [s.presidente, s.oracionInicio, s.oracionFinal,
+  [s.presidente, s.oracionInicio,
     ...[...(s.secciones || []), ...Object.values(s.extras || {})]
       .flatMap((x) => (x.filas || []).flatMap((f) => [f.nombre1, f.nombre2]))]
     .forEach((n) => { n = String(n || '').trim(); if (n) nombres.add(n); });
 }
 recolectarNombres(estado);
-Object.values(leer(KEY_GUARDADOS, {})).forEach(recolectarNombres);
 
 function guardarEstado() { escribir(KEY_ESTADO, estado); }
 
@@ -242,14 +238,6 @@ function renderFormulario() {
   });
 }
 
-function renderGuardados() {
-  const guardados = leer(KEY_GUARDADOS, {});
-  const claves = Object.keys(guardados).sort().reverse();
-  $('#guardados').innerHTML = claves.length
-    ? claves.map((k) => `<option value="${esc(k)}">${esc(guardados[k].fecha || k)}</option>`).join('')
-    : '<option value="">(no hay programas guardados)</option>';
-}
-
 function cambio() {
   guardarEstado();
   programarDibujo();
@@ -275,53 +263,16 @@ const acciones = {
   'subir-fila'(d) { mover(getPath(estado, d.base).filas, +d.f, -1); },
   'bajar-fila'(d) { mover(getPath(estado, d.base).filas, +d.f, 1); },
 
-  guardar() {
-    const guardados = leer(KEY_GUARDADOS, {});
-    const clave = estado.semana || estado.fecha || new Date().toISOString();
-    guardados[clave] = clonar(estado);
-    escribir(KEY_GUARDADOS, guardados);
-    renderGuardados();
-    $('#guardados').value = clave;
-    toast('Semana guardada');
-    return false;
-  },
-  cargar() {
-    const clave = $('#guardados').value;
-    const g = leer(KEY_GUARDADOS, {})[clave];
-    if (!g) return false;
-    estado = normalizar(clonar(g));
-    toast('Programa cargado');
-  },
-  'borrar-guardado'() {
-    const clave = $('#guardados').value;
-    const guardados = leer(KEY_GUARDADOS, {});
-    if (!guardados[clave] || !confirm(`¿Borrar el programa "${guardados[clave].fecha || clave}"?`)) return false;
-    delete guardados[clave];
-    escribir(KEY_GUARDADOS, guardados);
-    renderGuardados();
-    return false;
-  },
   'nueva-semana'() {
-    if (!confirm('Se guarda la semana actual y se arma la siguiente con los nombres vacíos. ¿Seguir?')) return false;
-    acciones.guardar();
+    if (!confirm('Se pasa a la semana siguiente y se vacían los nombres. ¿Seguir?')) return false;
     const base = estado.semana ? fechaDesdeISO(estado.semana) : new Date();
     base.setDate(base.getDate() + 7);
     estado.semana = aISO(base);
     estado.fecha = textoSemana(estado.semana);
-    estado.presidente = estado.oracionInicio = estado.oracionFinal = '';
+    estado.presidente = estado.oracionInicio = '';
     [...estado.secciones, ...Object.values(estado.extras)]
-      .forEach((s) => s.filas.forEach((f) => { f.nombre1 = ''; f.nombre2 = ''; }));
+      .forEach((x) => x.filas.forEach((f) => { f.nombre1 = ''; f.nombre2 = ''; }));
     toast('Nueva semana lista para completar');
-  },
-  exportar() {
-    const datos = { estado, nombres: [...nombres], guardados: leer(KEY_GUARDADOS, {}) };
-    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
-    descargarBlob(blob, `programa-semanal-respaldo-${aISO(new Date())}.json`);
-    return false;
-  },
-  reiniciar() {
-    if (!confirm('¿Reemplazar la planilla actual por el modelo original?')) return false;
-    estado = normalizar(clonar(MODELO));
   },
   async descargar() {
     const blob = await generarBlob();
@@ -375,34 +326,12 @@ $('#planilla').addEventListener('change', (e) => {
   }
 });
 
-$('#importar').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  try {
-    const datos = JSON.parse(await file.text());
-    if (datos.estado?.secciones) estado = normalizar(datos.estado);
-    else if (datos.secciones) estado = normalizar(datos);
-    else throw new Error('formato');
-    if (Array.isArray(datos.nombres)) datos.nombres.forEach((n) => nombres.add(n));
-    if (datos.guardados) escribir(KEY_GUARDADOS, { ...leer(KEY_GUARDADOS, {}), ...datos.guardados });
-    guardarNombres();
-    renderGuardados();
-    renderFormulario();
-    cambio();
-    toast('Respaldo importado');
-  } catch {
-    toast('El archivo no es un respaldo válido');
-  }
-});
-
 /* ---------- Imagen ---------- */
 
 const W = 1240;
-const H_BASE = 1600;
 const LINEA_SUP = 150;
-const LINEA_INF_BASE = 1322;
-const MARGEN_INF = H_BASE - LINEA_INF_BASE;
+const LINEA_INF_BASE = 1200;
+const MARGEN_INF = 278;
 const X_TEXTO = 125;
 const ANCHO_TEXTO = 480;
 const ALTO_LINEA = 30;
@@ -490,8 +419,8 @@ function componer(ctx, s, dibujar) {
   }));
 
   // Alturas fijas y pesos de los espacios flexibles
-  let fijo = altoEncabezado + ALTO_LINEA /* conclusión */ + ALTO_LINEA /* oración */;
-  let pesos = 1.6 + 1.3 + 1.0;
+  let fijo = altoEncabezado;
+  let pesos = 1.0; // espacio antes de la línea que cierra el programa
   for (const sec of secciones) {
     fijo += ALTO_BARRA;
     pesos += 1.0 + 0.9;
@@ -556,12 +485,6 @@ function componer(ctx, s, dibujar) {
       y += f.alto;
     });
   }
-
-  // Cierre
-  y += G * 1.6;
-  vineta(ctx, '#7d0022', s.conclusion, y + ALTO_LINEA / 2);
-  y += ALTO_LINEA + G * 1.3;
-  etiquetaNombre(ctx, 'Oración:', s.oracionFinal, y + ALTO_LINEA / 2);
 
   // Bloques opcionales debajo del divisor
   y = lineaInf + 6;
@@ -678,7 +601,6 @@ try {
 } catch { /* sin soporte */ }
 
 guardarNombres();
-renderGuardados();
 renderFormulario();
 dibujar();
 document.fonts.addEventListener?.('loadingdone', programarDibujo);
