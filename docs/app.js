@@ -18,7 +18,6 @@ const MODELO = {
   titulo: 'LECTURA SEMANAL DE LA BIBLIA',
   presidente: '',
   oracionInicio: '',
-  introduccion: 'Palabras de introducción (1 min).',
   secciones: [
     {
       titulo: 'TESOROS DE LA BIBLIA', color: '#575a5d',
@@ -330,7 +329,7 @@ $('#planilla').addEventListener('change', (e) => {
 
 const W = 1240;
 const LINEA_SUP = 150;
-const LINEA_INF_BASE = 1010;
+const LINEA_INF_BASE = 985;
 const MARGEN_INF = 278;
 const X_TEXTO = 125;
 const ANCHO_TEXTO = 480;
@@ -353,7 +352,7 @@ const NOMBRE_GENERICO = 'Nombre y apellido';
 let modoVista = true;
 
 const F = {
-  fecha: '500 23px Montserrat',
+  fecha: '600 27px Montserrat',
   titulo: '700 21px Montserrat',
   etiqueta: '500 15px Montserrat',
   barra: '700 19px Montserrat',
@@ -362,7 +361,7 @@ const F = {
 };
 
 const fuentesListas = Promise.all([
-  '500 23px Montserrat', '700 21px Montserrat', '500 15px Montserrat', '400 22px Roboto',
+  '600 27px Montserrat', '700 21px Montserrat', '500 15px Montserrat', '400 22px Roboto',
 ].map((f) => document.fonts.load(f))).catch(() => {});
 
 function partirLineas(ctx, texto, anchoPrimera, anchoResto = anchoPrimera) {
@@ -403,17 +402,14 @@ function componer(ctx, s, dibujar) {
 
   // Encabezado
   const yHead = LINEA_SUP + 47;
-  ctx.font = F.fecha;
-  const fechaTxt = s.fecha ? `${s.fecha} |` : '';
-  const anchoFecha = fechaTxt ? ctx.measureText(fechaTxt).width + 22 : 0;
+  const xTitulo = 92;
   ctx.font = F.titulo;
   letterSpacing(ctx, '1.5px');
-  const xTitulo = 92 + anchoFecha;
-  const lineasTitulo = partirLineas(ctx, s.titulo, 630 - xTitulo, 630 - 145);
+  const lineasTitulo = partirLineas(ctx, s.titulo, 630 - xTitulo);
   letterSpacing(ctx, '0px');
   const yOracionIni = yHead + 64;
-  const yIntro = Math.max(yOracionIni + 30, yHead + (lineasTitulo.length - 1) * 28 + 50);
-  const altoEncabezado = yIntro + 15 - LINEA_SUP;
+  const yFinEnc = Math.max(yOracionIni, yHead + (lineasTitulo.length - 1) * 28) + 30;
+  const altoEncabezado = yFinEnc - LINEA_SUP;
 
   // Medir filas
   ctx.font = F.texto;
@@ -466,21 +462,19 @@ function componer(ctx, s, dibujar) {
   // Encabezado izquierda
   ctx.fillStyle = '#1a1a1a';
   ctx.textAlign = 'left';
-  if (fechaTxt) { ctx.font = F.fecha; ctx.fillText(fechaTxt, 92, yHead + 1); }
+  // La fecha va arriba del primer divisor.
+  if (s.fecha) { ctx.font = F.fecha; ctx.fillText(s.fecha, xTitulo, LINEA_SUP - 42); }
   ctx.font = F.titulo;
   letterSpacing(ctx, '1.5px');
-  lineasTitulo.forEach((l, i) => ctx.fillText(l, i === 0 ? xTitulo : 145, yHead + i * 28));
+  lineasTitulo.forEach((l, i) => ctx.fillText(l, xTitulo, yHead + i * 28));
   letterSpacing(ctx, '0px');
 
   // Encabezado derecha
   etiquetaNombre(ctx, 'Presidente:', s.presidente, yHead);
   etiquetaNombre(ctx, 'Oración:', s.oracionInicio, yOracionIni);
 
-  // Introducción
-  vineta(ctx, '#575a5d', s.introduccion, yIntro);
-
   // Secciones
-  let y = yIntro + 15;
+  let y = yFinEnc;
   for (const sec of secciones) {
     y += G;
     dibujarBarra(ctx, sec, y);
@@ -553,18 +547,6 @@ function etiquetaNombre(ctx, etiq, nombre, y) {
   ctx.textAlign = 'left';
   const txt = nombreVisible(ctx, nombre);
   textoAjustado(ctx, txt, X_NOMBRE, y, W - X_NOMBRE - 30);
-}
-
-function vineta(ctx, color, texto, y) {
-  if (!texto) return;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(167, y, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#1a1a1a';
-  ctx.font = F.texto;
-  ctx.textAlign = 'left';
-  ctx.fillText(texto, 179, y);
 }
 
 async function dibujar() {

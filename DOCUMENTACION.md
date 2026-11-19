@@ -32,7 +32,7 @@ docs/
 
 - `app.js` mantiene un objeto `estado` con todos los datos y lo redibuja en el canvas (1240 px de ancho; el alto crece si hay más partes).
 - Las posiciones y tipografías están en las constantes y en `componer()`. Se usan Montserrat y Roboto desde Google Fonts.
-- La planilla arranca con los temas de las partes ya cargados, la semana actual y ningún nombre. En la vista previa, cada lugar vacío muestra "Nombre y apellido" en gris para que se vea completa; **ese texto no aparece en la imagen descargada**, donde un lugar vacío queda vacío. El programa termina en la última sección: no hay palabras de conclusión ni oración final.
+- La planilla arranca con los temas de las partes ya cargados, la semana actual y ningún nombre. En la vista previa, cada lugar vacío muestra "Nombre y apellido" en gris para que se vea completa; **ese texto no aparece en la imagen descargada**, donde un lugar vacío queda vacío. El programa no lleva palabras de introducción, de conclusión ni oración final: arranca en la primera sección y termina en la última. La fecha se dibuja arriba del primer divisor y el título queda debajo, a la izquierda.
 - Al elegir el lunes de la semana, el texto de la fecha se genera solo ("30-6 de diciembre"). Se puede corregir a mano.
 - Se pueden agregar, quitar y reordenar partes y secciones, y cambiar el color de cada sección.
 - **Bloques opcionales:** si alguno está activo, la línea negra que cerraba el programa pasa a ser el divisor, los bloques se dibujan debajo y otra línea cierra la imagen. Si no hay ninguno activo, la imagen queda igual que antes. Se puede cambiar el título y el color de cada barra, y agregar, quitar y reordenar las filas. Cada fila admite un segundo nombre (por ejemplo, dos acomodadores).
