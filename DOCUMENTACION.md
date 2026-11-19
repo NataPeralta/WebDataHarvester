@@ -12,7 +12,7 @@ No usa servidor, base de datos ni paso de compilación: los archivos de `docs/` 
 
 | Parte | Descripción |
 |---|---|
-| **Planilla autocompletable** | Formulario con fecha, presidente, oraciones, secciones y partes. Sugiere nombres mientras se escribe y suma los nuevos a la lista. |
+| **Planilla autocompletable** | Formulario con fecha, presidente, oraciones, secciones y partes. Sugiere nombres mientras se escribe y suma los nuevos a la lista. La lista es **propia de cada dispositivo** (ver sección 5). |
 | **Vista previa en vivo** | La imagen se dibuja en un `<canvas>` y se actualiza con cada cambio. |
 | **Descargar / compartir** | Exporta la imagen como PNG. En celulares compatibles aparece "Compartir". |
 | **Semanas guardadas** | Se guardan en el navegador, con respaldo exportable e importable en JSON. |
@@ -31,6 +31,7 @@ docs/
 
 - `app.js` mantiene un objeto `estado` con todos los datos y lo redibuja en el canvas (1240 px de ancho; el alto crece si hay más partes).
 - Las posiciones y tipografías están en las constantes y en `componer()`. Se usan Montserrat y Roboto desde Google Fonts.
+- La planilla arranca en blanco, con la semana actual. No trae ningún nombre.
 - Al elegir el lunes de la semana, el texto de la fecha se genera solo ("30-6 de diciembre"). Se puede corregir a mano.
 - Se pueden agregar, quitar y reordenar partes y secciones, y cambiar el color de cada sección.
 - **"Nueva semana →"** guarda la actual, avanza 7 días y deja las partes, pero vacía los nombres.
@@ -54,12 +55,18 @@ python3 -m http.server -d docs 8000
 | `programa-semanal:nombres:v1` | Lista de nombres para autocompletar. |
 | `programa-semanal:guardados:v1` | Semanas guardadas. |
 
-Son locales a cada navegador. Para pasarlos a otro dispositivo: **Exportar respaldo** e **Importar respaldo** (archivo JSON).
+Son locales a cada navegador.
+
+### Autocompletado por dispositivo
+- El código del sitio no trae ninguna lista de nombres: arranca vacía en cada dispositivo.
+- Cada nombre que se escribe en la planilla se agrega a la lista de ese dispositivo. También se aprenden los nombres de la planilla actual y de las semanas guardadas.
+- La lista se puede editar a mano en "Lista de nombres para autocompletar".
+- Un nombre cargado en un dispositivo no aparece en otro. Para copiar los nombres a otro dispositivo: **Exportar respaldo** en uno e **Importar respaldo** en el otro (archivo JSON).
 
 ## 6. Privacidad
 
 - La página no envía datos a ningún servidor: los nombres que se cargan quedan solo en el navegador de quien los escribe.
-- **Un sitio de GitHub Pages es público en internet, aunque el repositorio sea privado.** Tiene `noindex` para que los buscadores no lo muestren, pero cualquiera que tenga el link puede abrirlo. Ojo: `MODELO` y `NOMBRES_INICIALES` de `app.js` traen como ejemplo los nombres de la planilla original, así que esos nombres son visibles para cualquiera que abra el sitio o el código. Si no querés eso, reemplazalos por datos de ejemplo.
+- **Un sitio de GitHub Pages es público en internet, aunque el repositorio sea privado.** Tiene `noindex` para que los buscadores no lo muestren, pero cualquiera que tenga el link puede abrirlo. El código no contiene nombres de personas: el modelo (`MODELO` en `app.js`) está en blanco y la lista de autocompletado se arma en cada dispositivo. Los nombres que alguien escriba nunca salen de su navegador. Los nombres que estaban como ejemplo en versiones anteriores siguen en el historial de commits del repositorio.
 - Las páginas privadas con control de acceso solo existen en GitHub Enterprise Cloud.
 
 ## 7. Problemas frecuentes

@@ -11,44 +11,42 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
 
 const fila = (texto, nombre1 = '', nombre2 = '', etiqueta = '') => ({ texto, etiqueta, nombre1, nombre2 });
 
+// Modelo en blanco: no trae ningún nombre. Los nombres para autocompletar se arman
+// en cada dispositivo a partir de lo que se escribe ahí (ver "nombres" más abajo).
 const MODELO = {
-  semana: '2024-12-30',
-  fecha: '30-6 de diciembre',
+  semana: '',
+  fecha: '',
   titulo: 'LECTURA SEMANAL DE LA BIBLIA',
-  presidente: 'Jorge Johansson',
-  oracionInicio: 'Jorge Johansson',
+  presidente: '',
+  oracionInicio: '',
   introduccion: 'Palabras de introducción (1 min).',
   secciones: [
     {
       titulo: 'TESOROS DE LA BIBLIA', color: '#575a5d',
       filas: [
-        fila('1. Avancemos al ritmo del carro celestial de Jehová (10 mins).', 'Marcelo Massan'),
-        fila('2. Busquemos perlas escondidas (10 mins).', 'Javier Laffargue'),
-        fila('3. Lectura de la Biblia (4 mins).', 'Matías Vazquez', '', 'Estudiante:'),
+        fila('1. Avancemos al ritmo del carro celestial de Jehová (10 mins).'),
+        fila('2. Busquemos perlas escondidas (10 mins).'),
+        fila('3. Lectura de la Biblia (4 mins).', '', '', 'Estudiante:'),
       ],
     },
     {
       titulo: 'SEAMOS MEJORES MAESTROS', color: '#c18f00',
       filas: [
-        fila('4. Empecemos conversaciones (3 mins).', 'Franco Vasquez', 'Manuel Viñas'),
-        fila('5. Hagamos discípulos (5 mins).', 'Claudia Peralta', 'Erika Staltari'),
-        fila('7. Discurso (4 mins).', 'Antonio Borel'),
+        fila('4. Empecemos conversaciones (3 mins).'),
+        fila('5. Hagamos discípulos (5 mins).'),
+        fila('7. Discurso (4 mins).'),
       ],
     },
     {
       titulo: 'NUESTRA VIDA CRISTIANA', color: '#7d0022',
       filas: [
-        fila('8. Visita del superintendente', 'Sebastián Nicolini'),
+        fila('8. Visita del superintendente'),
       ],
     },
   ],
   conclusion: 'Palabras de conclusión (3 min.)',
-  oracionFinal: 'Hugo Longhi',
+  oracionFinal: '',
 };
-
-const NOMBRES_INICIALES = ['Antonio Borel', 'Claudia Peralta', 'Erika Staltari', 'Franco Vasquez',
-  'Hugo Longhi', 'Javier Laffargue', 'Jorge Johansson', 'Manuel Viñas', 'Marcelo Massan',
-  'Matías Vazquez', 'Sebastián Nicolini'];
 
 /* ---------- Utilidades ---------- */
 
@@ -102,8 +100,26 @@ function textoSemana(iso) {
 
 /* ---------- Estado ---------- */
 
+// El modelo arranca en la semana actual (lunes).
+{
+  const hoy = new Date();
+  hoy.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
+  MODELO.semana = aISO(hoy);
+  MODELO.fecha = textoSemana(MODELO.semana);
+}
+
 let estado = leer(KEY_ESTADO, null) || clonar(MODELO);
-let nombres = new Set(leer(KEY_NOMBRES, NOMBRES_INICIALES));
+
+// Lista de nombres de ESTE dispositivo: vive en el navegador y nunca viaja con la página.
+let nombres = new Set(leer(KEY_NOMBRES, []));
+
+function recolectarNombres(s) {
+  [s.presidente, s.oracionInicio, s.oracionFinal,
+    ...(s.secciones || []).flatMap((x) => (x.filas || []).flatMap((f) => [f.nombre1, f.nombre2]))]
+    .forEach((n) => { n = String(n || '').trim(); if (n) nombres.add(n); });
+}
+recolectarNombres(estado);
+Object.values(leer(KEY_GUARDADOS, {})).forEach(recolectarNombres);
 
 function guardarEstado() { escribir(KEY_ESTADO, estado); }
 
