@@ -8,7 +8,7 @@ const KEY_NOMBRES = 'programa-semanal:nombres:v1';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-const fila = (texto, nombre1 = '', nombre2 = '', etiqueta = '') => ({ texto, etiqueta, nombre1, nombre2 });
+const fila = (texto, nombre1 = '', nombre2 = '', etiqueta = '', dos = false) => ({ texto, etiqueta, nombre1, nombre2, dos });
 
 // Modelo en blanco: no trae ningún nombre. Los nombres para autocompletar se arman
 // en cada dispositivo a partir de lo que se escribe ahí (ver "nombres" más abajo).
@@ -31,8 +31,8 @@ const MODELO = {
     {
       titulo: 'SEAMOS MEJORES MAESTROS', color: '#c18f00',
       filas: [
-        fila('4. Empecemos conversaciones (3 mins).'),
-        fila('5. Hagamos discípulos (5 mins).'),
+        fila('4. Empecemos conversaciones (3 mins).', '', '', '', true),
+        fila('5. Hagamos discípulos (5 mins).', '', '', '', true),
         fila('7. Discurso (4 mins).'),
       ],
     },
@@ -57,7 +57,7 @@ const extrasModelo = () => ({
   },
   asignaciones: {
     activo: true, titulo: 'ASIGNACIONES', color: '#4b6a3f',
-    filas: [fila('Microfonista'), fila('Sonido'), fila('Zoom'), fila('Acomodadores'), fila('Puerta')],
+    filas: [fila('Microfonista', '', '', '', true), fila('Sonido'), fila('Zoom'), fila('Acomodadores', '', '', '', true), fila('Puerta')],
   },
 });
 MODELO.extras = extrasModelo();
@@ -169,10 +169,10 @@ function htmlFilas(sec, base, textos) {
             <input type="text" data-path="${p}.etiqueta" value="${esc(f.etiqueta)}" placeholder="Ej.: Estudiante:">
           </label>
           <label>Nombre
-            <input type="text" class="nombre" list="nombres" data-path="${p}.nombre1" value="${esc(f.nombre1)}">
+            <input type="text" class="nombre" list="nombres" data-path="${p}.nombre1" value="${esc(f.nombre1)}" placeholder="Nombre y apellido">
           </label>
           <label>${textos.segundo}
-            <input type="text" class="nombre" list="nombres" data-path="${p}.nombre2" value="${esc(f.nombre2)}">
+            <input type="text" class="nombre" list="nombres" data-path="${p}.nombre2" value="${esc(f.nombre2)}" placeholder="Nombre y apellido">
           </label>
         </div>
         <div class="fila-tools">
@@ -344,6 +344,11 @@ const X_ETIQ = 785;
 const X_NOMBRE = 805;
 const X_NOMBRE_A = 680;
 const X_NOMBRE_B = 870;
+
+// En la vista previa, los lugares vacíos muestran un nombre genérico en gris.
+// Al descargar la imagen no se dibuja: un lugar vacío queda vacío.
+const NOMBRE_GENERICO = 'Nombre y apellido';
+let modoVista = true;
 
 const F = {
   fecha: '500 23px Montserrat',
@@ -518,11 +523,10 @@ function dibujarFila(ctx, f, y) {
   ctx.font = F.texto;
   ctx.textAlign = 'left';
   f.lineas.forEach((l, li) => ctx.fillText(l, X_TEXTO, yPrimera + li * ALTO_LINEA));
-  if (f.nombre2) {
+  if (f.nombre2 || (modoVista && f.dos)) {
     if (f.etiqueta) etiqueta(ctx, f.etiqueta, X_NOMBRE_A - 14, yPrimera);
-    ctx.fillStyle = '#1a1a1a';
-    textoAjustado(ctx, f.nombre1 || '', X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 16);
-    textoAjustado(ctx, f.nombre2, X_NOMBRE_B, yPrimera, W - X_NOMBRE_B - 30);
+    textoAjustado(ctx, nombreVisible(ctx, f.nombre1), X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 16);
+    textoAjustado(ctx, nombreVisible(ctx, f.nombre2), X_NOMBRE_B, yPrimera, W - X_NOMBRE_B - 30);
   } else {
     etiquetaNombre(ctx, f.etiqueta, f.nombre1, yPrimera);
   }
@@ -536,11 +540,17 @@ function etiqueta(ctx, texto, xDer, y) {
   ctx.textAlign = 'left';
 }
 
+function nombreVisible(ctx, nombre) {
+  if (nombre) { ctx.fillStyle = '#1a1a1a'; return nombre; }
+  if (modoVista) { ctx.fillStyle = '#b9b9b9'; return NOMBRE_GENERICO; }
+  return '';
+}
+
 function etiquetaNombre(ctx, etiq, nombre, y) {
   if (etiq) etiqueta(ctx, etiq, X_ETIQ, y);
-  ctx.fillStyle = '#1a1a1a';
   ctx.textAlign = 'left';
-  textoAjustado(ctx, nombre || '', X_NOMBRE, y, W - X_NOMBRE - 30);
+  const txt = nombreVisible(ctx, nombre);
+  textoAjustado(ctx, txt, X_NOMBRE, y, W - X_NOMBRE - 30);
 }
 
 function vineta(ctx, color, texto, y) {
@@ -572,8 +582,14 @@ function programarDibujo() {
 }
 
 async function generarBlob() {
-  await dibujar();
-  return new Promise((res) => $('#lienzo').toBlob(res, 'image/png'));
+  modoVista = false; // la imagen descargada no lleva nombres genéricos
+  try {
+    await dibujar();
+    return await new Promise((res) => $('#lienzo').toBlob(res, 'image/png'));
+  } finally {
+    modoVista = true;
+    programarDibujo();
+  }
 }
 
 function nombreArchivo() {
