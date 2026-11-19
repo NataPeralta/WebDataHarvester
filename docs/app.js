@@ -48,6 +48,31 @@ const MODELO = {
   oracionFinal: '',
 };
 
+// Bloques opcionales que van debajo de un divisor horizontal, dentro de la misma imagen.
+const EXTRAS = [
+  { clave: 'finde', etiqueta: 'Reunión del fin de semana' },
+  { clave: 'asignaciones', etiqueta: 'Asignaciones' },
+];
+const extrasModelo = () => ({
+  finde: {
+    activo: true, titulo: 'REUNIÓN DEL FIN DE SEMANA', color: '#1f6f78',
+    filas: [fila('Discursante'), fila('Conductor de La Atalaya'), fila('Lector')],
+  },
+  asignaciones: {
+    activo: true, titulo: 'ASIGNACIONES', color: '#4b6a3f',
+    filas: [fila('Microfonista'), fila('Sonido'), fila('Zoom'), fila('Acomodadores'), fila('Puerta')],
+  },
+});
+MODELO.extras = extrasModelo();
+
+// Completa los datos guardados con versiones anteriores que no tenían los bloques opcionales.
+function normalizar(s) {
+  const base = extrasModelo();
+  s.extras = s.extras || {};
+  for (const { clave } of EXTRAS) s.extras[clave] = { ...base[clave], ...(s.extras[clave] || {}) };
+  return s;
+}
+
 /* ---------- Utilidades ---------- */
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -108,14 +133,15 @@ function textoSemana(iso) {
   MODELO.fecha = textoSemana(MODELO.semana);
 }
 
-let estado = leer(KEY_ESTADO, null) || clonar(MODELO);
+let estado = normalizar(leer(KEY_ESTADO, null) || clonar(MODELO));
 
 // Lista de nombres de ESTE dispositivo: vive en el navegador y nunca viaja con la página.
 let nombres = new Set(leer(KEY_NOMBRES, []));
 
 function recolectarNombres(s) {
   [s.presidente, s.oracionInicio, s.oracionFinal,
-    ...(s.secciones || []).flatMap((x) => (x.filas || []).flatMap((f) => [f.nombre1, f.nombre2]))]
+    ...[...(s.secciones || []), ...Object.values(s.extras || {})]
+      .flatMap((x) => (x.filas || []).flatMap((f) => [f.nombre1, f.nombre2]))]
     .forEach((n) => { n = String(n || '').trim(); if (n) nombres.add(n); });
 }
 recolectarNombres(estado);
@@ -133,13 +159,14 @@ function guardarNombres() {
 
 /* ---------- Formulario ---------- */
 
-function htmlSeccion(sec, si) {
-  const filas = sec.filas.map((f, fi) => {
-    const p = `secciones.${si}.filas.${fi}`;
+/** Filas editables de un bloque. `base` es la ruta del bloque dentro de `estado` (p. ej. "secciones.0" o "extras.finde"). */
+function htmlFilas(sec, base, textos) {
+  return sec.filas.map((f, fi) => {
+    const p = `${base}.filas.${fi}`;
     return `
       <div class="fila">
         <div class="fila-grid">
-          <label class="wide">Parte
+          <label class="wide">${textos.parte}
             <input type="text" data-path="${p}.texto" value="${esc(f.texto)}">
           </label>
           <label>Etiqueta (opcional)
@@ -148,41 +175,70 @@ function htmlSeccion(sec, si) {
           <label>Nombre
             <input type="text" class="nombre" list="nombres" data-path="${p}.nombre1" value="${esc(f.nombre1)}">
           </label>
-          <label>Ayudante (opcional)
+          <label>${textos.segundo}
             <input type="text" class="nombre" list="nombres" data-path="${p}.nombre2" value="${esc(f.nombre2)}">
           </label>
         </div>
         <div class="fila-tools">
-          <button type="button" class="btn small" data-action="subir-fila" data-s="${si}" data-f="${fi}" title="Subir" aria-label="Subir parte">↑</button>
-          <button type="button" class="btn small" data-action="bajar-fila" data-s="${si}" data-f="${fi}" title="Bajar" aria-label="Bajar parte">↓</button>
-          <button type="button" class="btn small danger" data-action="quitar-fila" data-s="${si}" data-f="${fi}">Quitar</button>
+          <button type="button" class="btn small" data-action="subir-fila" data-base="${base}" data-f="${fi}" title="Subir" aria-label="Subir">↑</button>
+          <button type="button" class="btn small" data-action="bajar-fila" data-base="${base}" data-f="${fi}" title="Bajar" aria-label="Bajar">↓</button>
+          <button type="button" class="btn small danger" data-action="quitar-fila" data-base="${base}" data-f="${fi}">Quitar</button>
         </div>
       </div>`;
   }).join('');
+}
 
+function htmlSeccion(sec, si) {
+  const base = `secciones.${si}`;
   return `
     <fieldset class="card" style="--section-color:${esc(sec.color)}">
       <div class="section-head">
         <label>Sección
-          <input type="text" data-path="secciones.${si}.titulo" value="${esc(sec.titulo)}">
+          <input type="text" data-path="${base}.titulo" value="${esc(sec.titulo)}">
         </label>
         <label class="color-label">Color
-          <input type="color" data-path="secciones.${si}.color" value="${esc(sec.color)}">
+          <input type="color" data-path="${base}.color" value="${esc(sec.color)}">
         </label>
         <button type="button" class="btn small" data-action="subir-seccion" data-s="${si}" aria-label="Subir sección">↑</button>
         <button type="button" class="btn small" data-action="bajar-seccion" data-s="${si}" aria-label="Bajar sección">↓</button>
         <button type="button" class="btn small danger" data-action="quitar-seccion" data-s="${si}">Quitar</button>
       </div>
-      ${filas}
-      <button type="button" class="btn ghost small" data-action="agregar-fila" data-s="${si}">+ Agregar parte</button>
+      ${htmlFilas(sec, base, { parte: 'Parte', segundo: 'Ayudante (opcional)' })}
+      <button type="button" class="btn ghost small" data-action="agregar-fila" data-base="${base}">+ Agregar parte</button>
+    </fieldset>`;
+}
+
+function htmlExtra({ clave, etiqueta }) {
+  const sec = estado.extras[clave];
+  const base = `extras.${clave}`;
+  return `
+    <fieldset class="card" style="--section-color:${esc(sec.color)}">
+      <div class="section-head">
+        <label class="check">
+          <input type="checkbox" data-path="${base}.activo"${sec.activo ? ' checked' : ''}>
+          Incluir “${esc(etiqueta)}” en la imagen
+        </label>
+      </div>
+      <div class="section-head">
+        <label>Título de la barra
+          <input type="text" data-path="${base}.titulo" value="${esc(sec.titulo)}">
+        </label>
+        <label class="color-label">Color
+          <input type="color" data-path="${base}.color" value="${esc(sec.color)}">
+        </label>
+      </div>
+      ${htmlFilas(sec, base, { parte: 'Asignación', segundo: 'Segundo nombre (opcional)' })}
+      <button type="button" class="btn ghost small" data-action="agregar-fila" data-base="${base}">+ Agregar</button>
     </fieldset>`;
 }
 
 function renderFormulario() {
   $('#secciones').innerHTML = estado.secciones.map(htmlSeccion).join('');
+  $('#extras').innerHTML = EXTRAS.map(htmlExtra).join('');
   document.querySelectorAll('#planilla [data-path]').forEach((el) => {
     const v = getPath(estado, el.dataset.path);
-    if (el.value !== (v ?? '')) el.value = v ?? '';
+    if (el.type === 'checkbox') el.checked = !!v;
+    else if (el.value !== (v ?? '')) el.value = v ?? '';
   });
 }
 
@@ -214,10 +270,10 @@ const acciones = {
   },
   'subir-seccion'(d) { mover(estado.secciones, +d.s, -1); },
   'bajar-seccion'(d) { mover(estado.secciones, +d.s, 1); },
-  'agregar-fila'(d) { estado.secciones[d.s].filas.push(fila('')); },
-  'quitar-fila'(d) { estado.secciones[d.s].filas.splice(d.f, 1); },
-  'subir-fila'(d) { mover(estado.secciones[d.s].filas, +d.f, -1); },
-  'bajar-fila'(d) { mover(estado.secciones[d.s].filas, +d.f, 1); },
+  'agregar-fila'(d) { getPath(estado, d.base).filas.push(fila('')); },
+  'quitar-fila'(d) { getPath(estado, d.base).filas.splice(d.f, 1); },
+  'subir-fila'(d) { mover(getPath(estado, d.base).filas, +d.f, -1); },
+  'bajar-fila'(d) { mover(getPath(estado, d.base).filas, +d.f, 1); },
 
   guardar() {
     const guardados = leer(KEY_GUARDADOS, {});
@@ -233,7 +289,7 @@ const acciones = {
     const clave = $('#guardados').value;
     const g = leer(KEY_GUARDADOS, {})[clave];
     if (!g) return false;
-    estado = clonar(g);
+    estado = normalizar(clonar(g));
     toast('Programa cargado');
   },
   'borrar-guardado'() {
@@ -253,7 +309,8 @@ const acciones = {
     estado.semana = aISO(base);
     estado.fecha = textoSemana(estado.semana);
     estado.presidente = estado.oracionInicio = estado.oracionFinal = '';
-    estado.secciones.forEach((s) => s.filas.forEach((f) => { f.nombre1 = ''; f.nombre2 = ''; }));
+    [...estado.secciones, ...Object.values(estado.extras)]
+      .forEach((s) => s.filas.forEach((f) => { f.nombre1 = ''; f.nombre2 = ''; }));
     toast('Nueva semana lista para completar');
   },
   exportar() {
@@ -264,7 +321,7 @@ const acciones = {
   },
   reiniciar() {
     if (!confirm('¿Reemplazar la planilla actual por el modelo original?')) return false;
-    estado = clonar(MODELO);
+    estado = normalizar(clonar(MODELO));
   },
   async descargar() {
     const blob = await generarBlob();
@@ -301,7 +358,7 @@ $('#planilla').addEventListener('input', (e) => {
   }
   const path = el.dataset.path;
   if (!path) return;
-  setPath(estado, path, el.value);
+  setPath(estado, path, el.type === 'checkbox' ? el.checked : el.value);
   if (path === 'semana') {
     estado.fecha = textoSemana(el.value);
     $('[data-path="fecha"]').value = estado.fecha;
@@ -324,8 +381,8 @@ $('#importar').addEventListener('change', async (e) => {
   if (!file) return;
   try {
     const datos = JSON.parse(await file.text());
-    if (datos.estado?.secciones) estado = datos.estado;
-    else if (datos.secciones) estado = datos;
+    if (datos.estado?.secciones) estado = normalizar(datos.estado);
+    else if (datos.secciones) estado = normalizar(datos);
     else throw new Error('formato');
     if (Array.isArray(datos.nombres)) datos.nombres.forEach((n) => nombres.add(n));
     if (datos.guardados) escribir(KEY_GUARDADOS, { ...leer(KEY_GUARDADOS, {}), ...datos.guardados });
@@ -349,6 +406,11 @@ const MARGEN_INF = H_BASE - LINEA_INF_BASE;
 const X_TEXTO = 125;
 const ANCHO_TEXTO = 480;
 const ALTO_LINEA = 30;
+const ALTO_BARRA = 28;
+const EXT_ANTES_BARRA = 36;
+const EXT_TRAS_BARRA = 24;
+const EXT_ENTRE_FILAS = 16;
+const EXT_CIERRE = 40;
 const X_ETIQ = 785;
 const X_NOMBRE = 805;
 const X_NOMBRE_A = 680;
@@ -428,7 +490,6 @@ function componer(ctx, s, dibujar) {
   }));
 
   // Alturas fijas y pesos de los espacios flexibles
-  const ALTO_BARRA = 28;
   let fijo = altoEncabezado + ALTO_LINEA /* conclusión */ + ALTO_LINEA /* oración */;
   let pesos = 1.6 + 1.3 + 1.0;
   for (const sec of secciones) {
@@ -439,7 +500,23 @@ function componer(ctx, s, dibujar) {
   const disponible = LINEA_INF_BASE - LINEA_SUP;
   const G = Math.min(72, Math.max(22, (disponible - fijo) / pesos));
   const lineaInf = Math.max(LINEA_INF_BASE, Math.ceil(LINEA_SUP + fijo + pesos * G));
-  const alto = lineaInf + MARGEN_INF;
+
+  // Bloques opcionales (fin de semana, asignaciones): van debajo de un divisor, con espaciado fijo.
+  const extras = EXTRAS.map(({ clave }) => s.extras?.[clave]).filter((e) => e && e.activo && e.filas.length)
+    .map((e) => ({
+      ...e,
+      filas: e.filas.map((f) => {
+        const lineas = partirLineas(ctx, f.texto, ANCHO_TEXTO);
+        return { ...f, lineas, alto: Math.max(lineas.length, 1) * ALTO_LINEA };
+      }),
+    }));
+  let altoExtras = 0;
+  for (const e of extras) {
+    altoExtras += EXT_ANTES_BARRA + ALTO_BARRA + EXT_TRAS_BARRA;
+    e.filas.forEach((f, i) => { altoExtras += f.alto + (i > 0 ? EXT_ENTRE_FILAS : 0); });
+  }
+  const lineaFin = extras.length ? lineaInf + 6 + altoExtras + EXT_CIERRE : lineaInf;
+  const alto = lineaFin + MARGEN_INF;
   if (!dibujar) return alto;
 
   // Fondo y líneas
@@ -447,7 +524,8 @@ function componer(ctx, s, dibujar) {
   ctx.fillRect(0, 0, W, alto);
   ctx.fillStyle = '#000000';
   ctx.fillRect(62, LINEA_SUP, 990, 6);
-  ctx.fillRect(62, lineaInf, 990, 6);
+  ctx.fillRect(62, lineaInf, 990, 6); // cierra el programa de entre semana (o es el divisor si hay bloques debajo)
+  if (extras.length) ctx.fillRect(62, lineaFin, 990, 6);
 
   // Encabezado izquierda
   ctx.fillStyle = '#1a1a1a';
@@ -469,30 +547,12 @@ function componer(ctx, s, dibujar) {
   let y = yIntro + 15;
   for (const sec of secciones) {
     y += G;
-    ctx.fillStyle = sec.color || '#575a5d';
-    ctx.fillRect(X_TEXTO, y, 510, ALTO_BARRA);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = F.barra;
-    letterSpacing(ctx, '-0.3px');
-    ctx.fillText(sec.titulo || '', X_TEXTO + 11, y + ALTO_BARRA / 2 + 1);
-    letterSpacing(ctx, '0px');
+    dibujarBarra(ctx, sec, y);
     y += ALTO_BARRA + G * 0.9;
 
     sec.filas.forEach((f, i) => {
       if (i > 0) y += G;
-      const yPrimera = y + ALTO_LINEA / 2;
-      ctx.fillStyle = '#1a1a1a';
-      ctx.font = F.texto;
-      ctx.textAlign = 'left';
-      f.lineas.forEach((l, li) => ctx.fillText(l, X_TEXTO, yPrimera + li * ALTO_LINEA));
-      if (f.nombre2) {
-        if (f.etiqueta) etiqueta(ctx, f.etiqueta, X_NOMBRE_A - 14, yPrimera);
-        ctx.fillStyle = '#1a1a1a';
-        textoAjustado(ctx, f.nombre1 || '', X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 16);
-        textoAjustado(ctx, f.nombre2, X_NOMBRE_B, yPrimera, W - X_NOMBRE_B - 30);
-      } else {
-        etiquetaNombre(ctx, f.etiqueta, f.nombre1, yPrimera);
-      }
+      dibujarFila(ctx, f, y);
       y += f.alto;
     });
   }
@@ -502,7 +562,47 @@ function componer(ctx, s, dibujar) {
   vineta(ctx, '#7d0022', s.conclusion, y + ALTO_LINEA / 2);
   y += ALTO_LINEA + G * 1.3;
   etiquetaNombre(ctx, 'Oración:', s.oracionFinal, y + ALTO_LINEA / 2);
+
+  // Bloques opcionales debajo del divisor
+  y = lineaInf + 6;
+  for (const e of extras) {
+    y += EXT_ANTES_BARRA;
+    dibujarBarra(ctx, e, y);
+    y += ALTO_BARRA + EXT_TRAS_BARRA;
+    e.filas.forEach((f, i) => {
+      if (i > 0) y += EXT_ENTRE_FILAS;
+      dibujarFila(ctx, f, y);
+      y += f.alto;
+    });
+  }
   return alto;
+}
+
+function dibujarBarra(ctx, sec, y) {
+  ctx.fillStyle = sec.color || '#575a5d';
+  ctx.fillRect(X_TEXTO, y, 510, ALTO_BARRA);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = F.barra;
+  ctx.textAlign = 'left';
+  letterSpacing(ctx, '-0.3px');
+  ctx.fillText(sec.titulo || '', X_TEXTO + 11, y + ALTO_BARRA / 2 + 1);
+  letterSpacing(ctx, '0px');
+}
+
+function dibujarFila(ctx, f, y) {
+  const yPrimera = y + ALTO_LINEA / 2;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = F.texto;
+  ctx.textAlign = 'left';
+  f.lineas.forEach((l, li) => ctx.fillText(l, X_TEXTO, yPrimera + li * ALTO_LINEA));
+  if (f.nombre2) {
+    if (f.etiqueta) etiqueta(ctx, f.etiqueta, X_NOMBRE_A - 14, yPrimera);
+    ctx.fillStyle = '#1a1a1a';
+    textoAjustado(ctx, f.nombre1 || '', X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 16);
+    textoAjustado(ctx, f.nombre2, X_NOMBRE_B, yPrimera, W - X_NOMBRE_B - 30);
+  } else {
+    etiquetaNombre(ctx, f.etiqueta, f.nombre1, yPrimera);
+  }
 }
 
 function etiqueta(ctx, texto, xDer, y) {

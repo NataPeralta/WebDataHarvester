@@ -161,3 +161,10 @@ textarea { resize: vertical; }
   opacity: 0; pointer-events: none; transition: .2s;
 }
 #toast.show { opacity: 1; transform: translateX(-50%); }
+
+.section-head label.check {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text); font: 600 14px Montserrat, sans-serif; cursor: pointer;
+}
+.section-head label.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.section-head + .section-head { margin-top: -12px; border-radius: 0; }
