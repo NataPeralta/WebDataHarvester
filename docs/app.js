@@ -330,12 +330,14 @@ $('#planilla').addEventListener('change', (e) => {
 
 const W = 1240;
 const LINEA_SUP = 150;
-const LINEA_INF_BASE = 1200;
+const LINEA_INF_BASE = 1010;
 const MARGEN_INF = 278;
 const X_TEXTO = 125;
 const ANCHO_TEXTO = 480;
 const ALTO_LINEA = 30;
 const ALTO_BARRA = 28;
+const ROW_GAP = 22; // espacio entre las partes de una sección
+const BARRA_GAP = 28; // espacio entre la barra y su primera parte
 const EXT_ANTES_BARRA = 36;
 const EXT_TRAS_BARRA = 24;
 const EXT_ENTRE_FILAS = 16;
@@ -427,9 +429,9 @@ function componer(ctx, s, dibujar) {
   let fijo = altoEncabezado;
   let pesos = 1.0; // espacio antes de la línea que cierra el programa
   for (const sec of secciones) {
-    fijo += ALTO_BARRA;
-    pesos += 1.0 + 0.9;
-    sec.filas.forEach((f, i) => { fijo += f.alto; if (i > 0) pesos += 1.0; });
+    fijo += ALTO_BARRA + BARRA_GAP;
+    pesos += 1.0;
+    sec.filas.forEach((f, i) => { fijo += f.alto + (i > 0 ? ROW_GAP : 0); });
   }
   const disponible = LINEA_INF_BASE - LINEA_SUP;
   const G = Math.min(72, Math.max(22, (disponible - fijo) / pesos));
@@ -482,10 +484,10 @@ function componer(ctx, s, dibujar) {
   for (const sec of secciones) {
     y += G;
     dibujarBarra(ctx, sec, y);
-    y += ALTO_BARRA + G * 0.9;
+    y += ALTO_BARRA + BARRA_GAP;
 
     sec.filas.forEach((f, i) => {
-      if (i > 0) y += G;
+      if (i > 0) y += ROW_GAP;
       dibujarFila(ctx, f, y);
       y += f.alto;
     });
