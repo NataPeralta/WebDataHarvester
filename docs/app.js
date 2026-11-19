@@ -13,6 +13,7 @@ const fila = (texto, nombre1 = '', nombre2 = '', etiqueta = '', dos = false) => 
 // Modelo en blanco: no trae ningún nombre. Los nombres para autocompletar se arman
 // en cada dispositivo a partir de lo que se escribe ahí (ver "nombres" más abajo).
 const MODELO = {
+  sinNumeros: true,
   semana: '',
   fecha: '',
   titulo: 'LECTURA SEMANAL DE LA BIBLIA',
@@ -22,23 +23,23 @@ const MODELO = {
     {
       titulo: 'TESOROS DE LA BIBLIA', color: '#575a5d',
       filas: [
-        fila('1. Avancemos al ritmo del carro celestial de Jehová (10 mins).'),
-        fila('2. Busquemos perlas escondidas (10 mins).'),
-        fila('3. Lectura de la Biblia (4 mins).', '', '', 'Estudiante:'),
+        fila('Avancemos al ritmo del carro celestial de Jehová (10 mins).'),
+        fila('Busquemos perlas escondidas (10 mins).'),
+        fila('Lectura de la Biblia (4 mins).', '', '', 'Estudiante:'),
       ],
     },
     {
       titulo: 'SEAMOS MEJORES MAESTROS', color: '#c18f00',
       filas: [
-        fila('4. Empecemos conversaciones (3 mins).', '', '', '', true),
-        fila('5. Hagamos discípulos (5 mins).', '', '', '', true),
-        fila('7. Discurso (4 mins).'),
+        fila('Empecemos conversaciones (3 mins).', '', '', '', true),
+        fila('Hagamos discípulos (5 mins).', '', '', '', true),
+        fila('Discurso (4 mins).'),
       ],
     },
     {
       titulo: 'NUESTRA VIDA CRISTIANA', color: '#7d0022',
       filas: [
-        fila('8. Visita del superintendente'),
+        fila('Visita del superintendente'),
       ],
     },
   ],
@@ -66,6 +67,13 @@ function normalizar(s) {
   const base = extrasModelo();
   s.extras = s.extras || {};
   for (const { clave } of EXTRAS) s.extras[clave] = { ...base[clave], ...(s.extras[clave] || {}) };
+  // Una sola vez: quita la numeración ("1.", "2." …) del comienzo de las partes ya guardadas.
+  if (!s.sinNumeros) {
+    (s.secciones || []).forEach((sec) => (sec.filas || []).forEach((f) => {
+      f.texto = String(f.texto || '').replace(/^\s*\d+\s*[.)]\s*/, '');
+    }));
+    s.sinNumeros = true;
+  }
   return s;
 }
 
@@ -331,8 +339,15 @@ const W = 1240;
 const LINEA_SUP = 150;
 const LINEA_INF_BASE = 985;
 const MARGEN_INF = 278;
-const X_TEXTO = 125;
-const ANCHO_TEXTO = 480;
+// Grilla de la imagen: las líneas van de 62 a 1178 y todo lo demás respeta un margen interno de 30 px.
+const LINEA_X = 62;
+const LINEA_ANCHO = 1116;
+const X_IZQ = 92; // margen interno izquierdo: fecha y barras
+const X_DER = 1148; // margen interno derecho: fin de los nombres
+const CENTRO = 620;
+const ANCHO_BARRA = 580;
+const X_TEXTO = 103; // las partes arrancan alineadas con el título de la barra
+const ANCHO_TEXTO = 470;
 const ALTO_LINEA = 30;
 const ALTO_BARRA = 28;
 const ROW_GAP = 22; // espacio entre las partes de una sección
@@ -341,10 +356,8 @@ const EXT_ANTES_BARRA = 36;
 const EXT_TRAS_BARRA = 24;
 const EXT_ENTRE_FILAS = 16;
 const EXT_CIERRE = 40;
-const X_ETIQ = 785;
-const X_NOMBRE = 805;
-const X_NOMBRE_A = 680;
-const X_NOMBRE_B = 870;
+const X_NOMBRE_A = 700; // primera columna de nombres (también la de los nombres solos)
+const X_NOMBRE_B = 930; // segunda columna (ayudante)
 
 // En la vista previa, los lugares vacíos muestran un nombre genérico en gris.
 // Al descargar la imagen no se dibuja: un lugar vacío queda vacío.
@@ -401,14 +414,14 @@ function componer(ctx, s, dibujar) {
   ctx.textBaseline = 'middle';
 
   // Encabezado
+  // Título centrado y, debajo, presidente y oración en una fila también centrada.
   const yHead = LINEA_SUP + 47;
-  const xTitulo = 92;
   ctx.font = F.titulo;
   letterSpacing(ctx, '1.5px');
-  const lineasTitulo = partirLineas(ctx, s.titulo, 630 - xTitulo);
+  const lineasTitulo = partirLineas(ctx, s.titulo, LINEA_ANCHO - 100);
   letterSpacing(ctx, '0px');
-  const yOracionIni = yHead + 64;
-  const yFinEnc = Math.max(yOracionIni, yHead + (lineasTitulo.length - 1) * 28) + 30;
+  const yPersonas = yHead + (lineasTitulo.length - 1) * 28 + 52;
+  const yFinEnc = yPersonas + 30;
   const altoEncabezado = yFinEnc - LINEA_SUP;
 
   // Medir filas
@@ -455,23 +468,25 @@ function componer(ctx, s, dibujar) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, alto);
   ctx.fillStyle = '#000000';
-  ctx.fillRect(62, LINEA_SUP, 990, 6);
-  ctx.fillRect(62, lineaInf, 990, 6); // cierra el programa de entre semana (o es el divisor si hay bloques debajo)
-  if (extras.length) ctx.fillRect(62, lineaFin, 990, 6);
+  ctx.fillRect(LINEA_X, LINEA_SUP, LINEA_ANCHO, 6);
+  ctx.fillRect(LINEA_X, lineaInf, LINEA_ANCHO, 6); // cierra el programa de entre semana (o es el divisor si hay bloques debajo)
+  if (extras.length) ctx.fillRect(LINEA_X, lineaFin, LINEA_ANCHO, 6);
 
-  // Encabezado izquierda
+  // La fecha va arriba del primer divisor, a la izquierda.
   ctx.fillStyle = '#1a1a1a';
   ctx.textAlign = 'left';
-  // La fecha va arriba del primer divisor.
-  if (s.fecha) { ctx.font = F.fecha; ctx.fillText(s.fecha, xTitulo, LINEA_SUP - 42); }
-  ctx.font = F.titulo;
-  letterSpacing(ctx, '1.5px');
-  lineasTitulo.forEach((l, i) => ctx.fillText(l, xTitulo, yHead + i * 28));
-  letterSpacing(ctx, '0px');
+  if (s.fecha) { ctx.font = F.fecha; ctx.fillText(s.fecha, X_IZQ, LINEA_SUP - 42); }
 
-  // Encabezado derecha
-  etiquetaNombre(ctx, 'Presidente:', s.presidente, yHead);
-  etiquetaNombre(ctx, 'Oración:', s.oracionInicio, yOracionIni);
+  // Título centrado
+  ctx.font = F.titulo;
+  ctx.textAlign = 'center';
+  letterSpacing(ctx, '1.5px');
+  lineasTitulo.forEach((l, i) => ctx.fillText(l, CENTRO, yHead + i * 28));
+  letterSpacing(ctx, '0px');
+  ctx.textAlign = 'left';
+
+  // Presidente y oración
+  dibujarPersonas(ctx, [['Presidente:', s.presidente], ['Oración:', s.oracionInicio]], yPersonas);
 
   // Secciones
   let y = yFinEnc;
@@ -504,12 +519,12 @@ function componer(ctx, s, dibujar) {
 
 function dibujarBarra(ctx, sec, y) {
   ctx.fillStyle = sec.color || '#575a5d';
-  ctx.fillRect(X_TEXTO, y, 510, ALTO_BARRA);
+  ctx.fillRect(X_IZQ, y, ANCHO_BARRA, ALTO_BARRA);
   ctx.fillStyle = '#ffffff';
   ctx.font = F.barra;
   ctx.textAlign = 'left';
   letterSpacing(ctx, '-0.3px');
-  ctx.fillText(sec.titulo || '', X_TEXTO + 11, y + ALTO_BARRA / 2 + 1);
+  ctx.fillText(sec.titulo || '', X_TEXTO, y + ALTO_BARRA / 2 + 1);
   letterSpacing(ctx, '0px');
 }
 
@@ -519,13 +534,32 @@ function dibujarFila(ctx, f, y) {
   ctx.font = F.texto;
   ctx.textAlign = 'left';
   f.lineas.forEach((l, li) => ctx.fillText(l, X_TEXTO, yPrimera + li * ALTO_LINEA));
+  if (f.etiqueta) etiqueta(ctx, f.etiqueta, X_NOMBRE_A - 14, yPrimera);
   if (f.nombre2 || (modoVista && f.dos)) {
-    if (f.etiqueta) etiqueta(ctx, f.etiqueta, X_NOMBRE_A - 14, yPrimera);
-    textoAjustado(ctx, nombreVisible(ctx, f.nombre1), X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 16);
-    textoAjustado(ctx, nombreVisible(ctx, f.nombre2), X_NOMBRE_B, yPrimera, W - X_NOMBRE_B - 30);
+    textoAjustado(ctx, nombreVisible(ctx, f.nombre1), X_NOMBRE_A, yPrimera, X_NOMBRE_B - X_NOMBRE_A - 14);
+    textoAjustado(ctx, nombreVisible(ctx, f.nombre2), X_NOMBRE_B, yPrimera, X_DER - X_NOMBRE_B);
   } else {
-    etiquetaNombre(ctx, f.etiqueta, f.nombre1, yPrimera);
+    textoAjustado(ctx, nombreVisible(ctx, f.nombre1), X_NOMBRE_A, yPrimera, X_DER - X_NOMBRE_A);
   }
+}
+
+/** Fila centrada con pares "Etiqueta: nombre". Cada nombre tiene un ancho fijo para que el conjunto no se mueva. */
+function dibujarPersonas(ctx, grupos, y) {
+  const ANCHO_NOMBRE = 200;
+  const SEP = 14;
+  const ENTRE = 90;
+  ctx.font = F.etiqueta;
+  const anchos = grupos.map(([etiq]) => ctx.measureText(etiq).width);
+  const total = anchos.reduce((a, w) => a + w + SEP + ANCHO_NOMBRE, 0) + ENTRE * (grupos.length - 1);
+  let x = CENTRO - total / 2;
+  grupos.forEach(([etiq, nombre], i) => {
+    ctx.font = F.etiqueta;
+    ctx.fillStyle = '#3a3a3a';
+    ctx.textAlign = 'left';
+    ctx.fillText(etiq, x, y + 1);
+    textoAjustado(ctx, nombreVisible(ctx, nombre), x + anchos[i] + SEP, y, ANCHO_NOMBRE);
+    x += anchos[i] + SEP + ANCHO_NOMBRE + ENTRE;
+  });
 }
 
 function etiqueta(ctx, texto, xDer, y) {
@@ -540,13 +574,6 @@ function nombreVisible(ctx, nombre) {
   if (nombre) { ctx.fillStyle = '#1a1a1a'; return nombre; }
   if (modoVista) { ctx.fillStyle = '#b9b9b9'; return NOMBRE_GENERICO; }
   return '';
-}
-
-function etiquetaNombre(ctx, etiq, nombre, y) {
-  if (etiq) etiqueta(ctx, etiq, X_ETIQ, y);
-  ctx.textAlign = 'left';
-  const txt = nombreVisible(ctx, nombre);
-  textoAjustado(ctx, txt, X_NOMBRE, y, W - X_NOMBRE - 30);
 }
 
 async function dibujar() {
