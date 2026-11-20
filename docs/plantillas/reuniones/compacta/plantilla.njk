@@ -1,0 +1,58 @@
+{% macro dibujar(fila) %}
+<div class="{{ fila.clase }}">
+  <div class="tiempo">{{ fila.tiempo }}</div>
+  <div class="{{ fila.textoClase }}">{{ fila.texto }}</div>
+  {% if fila.pieza %}
+  <div class="etiqueta span-salas"></div>
+  {% else %}
+  <div class="etiqueta">{{ fila.etiqueta }}</div>
+  {% if fila.aux %}<div class="nombre aux{% if fila.aux.vacio %} vacio{% endif %}">{{ fila.aux.texto }}</div>{% endif %}
+  {% if fila.principal %}<div class="nombre{% if fila.principal.vacio %} vacio{% endif %}">{{ fila.principal.texto }}</div>{% endif %}
+  {% endif %}
+</div>
+{% endmacro %}
+<div id="contenido">
+{% for semana in semanas %}
+{% if semana.separador %}
+<div class="espacio-centro"></div>
+<div class="regla"></div>
+{% endif %}
+<div class="bloque-semana">
+  {% if semana.fecha or semana.cong %}
+  <div class="tope">
+    {% if semana.fecha %}<p class="fecha{% if semana.fecha.vacio %} vacio{% endif %}">{{ semana.fecha.texto }}</p>{% endif %}
+    {% if semana.cong %}<p class="cong{% if semana.cong.vacio %} vacio{% endif %}">{{ semana.cong.texto }}</p>{% endif %}
+  </div>
+  <div class="regla"></div>
+  {% endif %}
+  {% for reunion in semana.reuniones %}
+    {% if reunion.primera %}
+    <h1 class="titulo">{{ reunion.titulo }}</h1>
+    {% else %}
+    <div class="regla"></div>
+    <div class="fila finde">
+      <div class="cuando ocupa{% if reunion.tituloVacio %} vacio{% endif %}">{{ reunion.titulo }}</div>
+      <div class="etiqueta">Presidente:</div>
+      <div class="nombre{% if reunion.presidente.vacio %} vacio{% endif %}">{{ reunion.presidente.texto }}</div>
+    </div>
+    {% endif %}
+    {% for fila in reunion.antes %}{{ dibujar(fila) | safe }}{% endfor %}
+    {% for sec in reunion.secciones %}
+    <div class="fila sec">
+      <div class="barra-sec{% if sec.conSalas %} con-salas{% endif %}" style="background: {{ sec.color }}">
+        <div class="barra-titulo">{{ sec.titulo }}</div>
+        {% if sec.conSalas %}
+        <div class="barra-sala">Sala auxiliar</div>
+        <div class="barra-sala">Auditorio principal</div>
+        {% endif %}
+      </div>
+    </div>
+    {% if sec.cancion %}{{ dibujar(sec.cancion) | safe }}{% endif %}
+    {% for fila in sec.filas %}{{ dibujar(fila) | safe }}{% endfor %}
+    {% endfor %}
+    {% if reunion.cancionSuelta %}{{ dibujar(reunion.cancionSuelta) | safe }}{% endif %}
+    {% for fila in reunion.despues %}{{ dibujar(fila) | safe }}{% endfor %}
+  {% endfor %}
+</div>
+{% endfor %}
+</div>

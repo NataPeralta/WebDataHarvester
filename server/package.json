@@ -1,0 +1,14 @@
+{
+  "name": "programa-semanal-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "node --watch index.js",
+    "build": "node ../scripts/build.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "express": "^4.21.2"
+  }
+}

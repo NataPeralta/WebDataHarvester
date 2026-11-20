@@ -1,62 +1,52 @@
-# Product Price Scraper
+# Programa semanal
 
-A modular web scraping system for tracking products and prices from different retailers.
+Planilla para completar el programa de la semana y descargar PNG/PDF (hoja A4).
 
-## Project Structure
+En desarrollo el servidor sirve [`docs/`](docs/): la vista previa es el HTML y el CSS de la plantilla. En producción (`NODE_ENV=production`) sirve solo [`dist/`](dist/) y la vista previa es el canvas. El contenedor no incluye `docs/`.
 
+Servidor Node en [`server/`](server/) que sirve el sitio y sincroniza el programa desde jw.org (`GET /api/semana?lunes=YYYY-MM-DD`). El scrape trae la guía MWB (entre semana) y, para el finde, canciones intermedia/final desde el artículo de estudio de La Atalaya. Si esas canciones fallan, la respuesta sigue en 200 con `parcial: true` y `advertencias` (no finge éxito total con strings vacíos silenciosos).
+
+Puerto por defecto: **8097** (`PORT` en env lo puede cambiar).
+
+- **Producción (casa):** `http://192.168.1.50:8097/` → subdominio Cloudflare `programa.nataperalta.com.ar` (ruta tunnel)
+- **Detalle:** [DOCUMENTACION.md](DOCUMENTACION.md)
+
+## Local
+
+```bash
+cd server && npm install && npm run dev
+# abrir http://localhost:8097/  (HTML y CSS en vivo)
 ```
-├── src/
-│   ├── scrapers/
-│   │   ├── base.js         # Base scraper class
-│   │   └── vea/           # Vea-specific implementation
-│   │       ├── index.js    # Vea scraper implementation
-│   │       ├── parser.js   # HTML parsing functions
-│   │       └── selectors.js # HTML selectors
-│   ├── database.js        # Database operations
-│   ├── models.js          # Data models
-│   ├── utils.js           # Utility functions
-│   └── index.js           # Main entry point
-└── data/                  # Database storage
+
+Producción local (solo `dist/`):
+
+```bash
+cd server && npm run build && npm start
 ```
 
-## Installation
+Solo frontend **sin API** (python en `:8000` no tiene `/api/semana`; no sirve para sincronizar):
 
-1. Install Node.js (version 16 or higher)
-2. Install project dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+python -m http.server -d docs 8000
+```
 
-## Required Dependencies
+Para sincronizar: `cd server && npm run dev` → http://localhost:8097/
 
-- puppeteer
-- sqlite3
-- ws
-- @neondatabase/serverless
-- drizzle-orm
+## Deploy
 
-## Usage
+Auto-deploy con GitHub Actions (self-hosted en `ny-server-house`) al hacer **push** a:
 
-1. Run the scraper:
-   ```bash
-   node src/index.js
-   ```
+- `claude/github-pages-site-ln6583`
+- `main`
 
-## Adding New Retailers
+Workflow: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) → `git reset --hard` en `/home/nata/programa-semanal` + `docker compose up -d --build`.
 
-To add a new retailer:
+También se puede disparar a mano: Actions → Deploy → Run workflow.
 
-1. Create a new folder under `src/scrapers/` for the retailer
-2. Create three files:
-   - `selectors.js`: Define HTML selectors for the retailer's website
-   - `parser.js`: Implement parsing logic
-   - `index.js`: Implement the retailer-specific scraper class
-3. Extend the BaseScraper class and implement required methods
+Manual (LAN):
 
-## Database Schema
-
-The system uses SQLite with the following schema:
-
-- retailers: Stores information about retail stores
-- products: Stores product information
-- prices: Stores price history for products
+```bash
+rsync -avz --delete --exclude node_modules --exclude .git \
+  ./ nata@192.168.1.50:/home/nata/programa-semanal/
+ssh nata@192.168.1.50 'cd /home/nata/programa-semanal && docker compose up -d --build'
+```

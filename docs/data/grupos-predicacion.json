@@ -1,0 +1,51 @@
+{
+  "titulo": "Grupos de predicación",
+  "actualizado": "Actualizado Noviembre 2026",
+  "congregacion": "Oeste Tres Arroyos",
+  "lista": [
+    {
+      "nombre": "Grupo de predicación N 1",
+      "listado": "Sup | Oscar Velarde (PR) Sup.G.\nNancy Velarde (PR)\nSe. Centurion PR:   Aux\nViviana Centurion P.R.\nClorinda Moris\nEva Tomalino\nNoelia Arriagada\nSabrina Barú\nOscar Defendis\n10. Juan Arriagada\n11. Noelia Arriagada\n12. Lucas Barrera\n13. Daniel Carrasco\n14. Claudia Defendis\n15. Lorena Barreras\n16. Dario Baru\n17. Milena de Carrasco\n18. \n19. ",
+      "inactivos": "Ez. Suarez- Seb.Arrupe Ariel Aristain- Sacada,Ro.Buono",
+      "color": "#ffe600",
+      "conductor": "",
+      "ayudante": "",
+      "lugar": "",
+      "hora": "",
+      "integrantes": ""
+    },
+    {
+      "nombre": "Grupo de predicación N 2",
+      "listado": "Sup | Alberto Rivas Sup.Grupo\nAlejandra Díaz\nAlberto Sejas\nAlicia Sejas\nClaudia Altuna\nAriana Lorenzo\nPedro Varela (PR)Auxiliar\nJosefina Varela (PR)\nNoraly Varela (PR)\n10. Ruben Osinaga\n11. Maria Rivas\n12. Samuel Sánchez\n13. Corali de Sánchez\n14. Jazmin Sánchez\n15. Hernan Díaz\n16. Ana Lorenzo\n17. \n18. \n19. ",
+      "inactivos": "José Sejas-Al.Lorenzo Raul Buono- Verónica Amaya",
+      "color": "#00b0f0",
+      "conductor": "",
+      "ayudante": "",
+      "lugar": "",
+      "hora": "",
+      "integrantes": ""
+    },
+    {
+      "nombre": "Grupo de predicación N 3",
+      "listado": "Sup | Cesar Suarez Sup. Grupo\nSilvia Suarez\nSofia Barragan\nPablo Cicheto S.M.P.R.\nRamiro Canaan (SM)\nRebeca Canan\nMailen Canan\nJosé Tisera P.R.\nMario Barragan\n10. Carina Barragan\n11. Matias Barragan\n12. Marcela Torres\n13. Teresa Aristain\n14. Ni. Barroca (SM) Aux\n15. Silvia Barroca P.R.\n16. Elsa Cortadi\n17. Natalia Cicheto P.R\n18. \n19. ",
+      "inactivos": "Matias Centurion-Nora Gisbert",
+      "color": "#92d050",
+      "conductor": "",
+      "ayudante": "",
+      "lugar": "",
+      "hora": "",
+      "integrantes": ""
+    },
+    {
+      "nombre": "Grupo de predicación N 4",
+      "listado": "Sup | Jon. Peralta (PR)Sup. Gr.\nAlicia Peralta (PR)\nPerla Arrupe\nGraciela Gandulco\nAlejandro Bigoni\nAnalia Bigoni\nJuan C.Osinaga A:aux\nFabiana de Osinaga P.R\nCarina Baru PR\n10. Fernanda Izurieta\n11. Ruben Baru P.R\n12. Lucas Suarez\n13. Mariana Suarez\n14. Roberto Lezcano\n15. Marcos Sanchez\n16. Julio Cabajani\n17. Monica de Cabajani\n18. Monica Molina",
+      "inactivos": "Matias Moran Be.Colantonio L.Moran-T.Moran-C.Moran- Hugo Mateo Oriente",
+      "color": "#ffc000",
+      "conductor": "",
+      "ayudante": "",
+      "lugar": "",
+      "hora": "",
+      "integrantes": ""
+    }
+  ]
+}

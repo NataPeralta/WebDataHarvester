@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Programa semanal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <!--
+    Contrato: render(datos, opciones) recibe la planilla completa.
+    opciones.vista muestra el texto genérico en los nombres vacíos.
+    exportarPNG(datos) devuelve el PNG de #hoja.
+  -->
+  <div id="hoja"><div id="contenido"></div></div>
+  <script>
+'use strict';
+
+const HOJA_ALTO = 1754;
+const MARGEN_INF = 70;
+const E_MIN = 0.3;
+const E_MAX = 1.6;
+const NOMBRE_GENERICO = 'Nombre y apellido';
+const GAP = {
+  tituloArriba: 27,
+  tituloAbajo: 23,
+  primeraSeccion: 65,
+  seccion: 50,
+  barra: 28,
+  fila: 22,
+  oracion: 50,
+  extraAntes: 36,
+  extraTitulo: 24,
+  extraFila: 16,
+  extraCierre: 40,
+};
+
+function nodo(clase) {
+  const n = document.createElement('div');
+  if (clase) n.className = clase;
+  return n;
+}
+
+function nodoNombre(texto, ancho, vista) {
+  const vacio = !String(texto || '').trim();
+  const n = document.createElement('span');
+  n.className = 'nombre' + (vacio && vista ? ' vacio' : '');
+  n.textContent = vacio ? (vista ? NOMBRE_GENERICO : '') : texto;
+  n.style.width = ancho + 'px';
+  return n;
+}
+
+function personas(grupos, vista) {
+  const row = nodo('personas');
+  grupos.forEach(([etiq, nombre]) => {
+    const g = nodo('persona');
+    const e = document.createElement('span');
+    e.className = 'etiq';
+    e.textContent = etiq;
+    g.append(e, nodoNombre(nombre, 200, vista));
+    row.append(g);
+  });
+  return row;
+}
+
+function unidos(f) {
+  const a = String(f?.nombre1 || '').trim();
+  const b = String(f?.nombre2 || '').trim();
+  if (a && b) return `${a} / ${b}`;
+  return a || b || '';
+}
+function conDosPuntos(valor) {
+  const t = String(valor || '').trim();
+  if (!t) return '';
+  return /:\s*$/.test(t) ? t : `${t}:`;
+}
+/** Paridad mínima con compacta: duración o reloj de la parte, sin columna tipográfica nueva. */
+function tiempoParte(f) {
+  const raw = String(f?.tiempo || '').trim();
+  const desdeTexto = String(f?.texto || '').match(/^(\d{1,2}:\d{2}|\d+)\s*mins?\.?\s*/i);
+  const t = raw || (desdeTexto ? desdeTexto[1] : '');
+  if (!t) return '';
+  const reloj = t.match(/^(\d{1,2}:\d{2})/);
+  if (reloj) return reloj[1];
+  const n = t.match(/^(\(?\d+)/);
+  if (n) return `${n[1].replace('(', '')} min`;
+  return '';
+}
+function textoParte(f) {
+  let s = String(f?.texto || '').trim();
+  s = s.replace(/^(\d{1,2}:\d{2}|\d+)\s*mins?\.?\s*[•●·]?\s*/i, '').replace(/^[•●·]\s*/, '');
+  const t = tiempoParte(f);
+  if (!t) return s;
+  if (/\(\s*\d[^)]*min/i.test(s) || new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(s)) return s;
+  return s ? `${t} · ${s}` : t;
+}
+function filaNodo(f, vista) {
+  const grupo = nodo('filas-grupo');
+  const salas = Array.isArray(f.salaAuxiliar) ? f.salaAuxiliar : [];
+  const aux0 = salas[0];
+  const tieneAux = !!aux0;
+  const fila = nodo(tieneAux ? 'fila' : 'fila sin-aux');
+  const texto = nodo('fila-texto');
+  texto.textContent = textoParte(f);
+  fila.append(texto);
+
+  const etiqPrin = conDosPuntos(f.etiqueta);
+  const etiqAux = aux0 ? (conDosPuntos(aux0.etiqueta) || etiqPrin) : '';
+  if (etiqAux || etiqPrin) {
+    const et = nodo('etiqueta');
+    et.textContent = etiqAux || etiqPrin;
+    fila.append(et);
+  }
+
+  const nombres = nodo('nombres');
+  if (tieneAux) {
+    nombres.append(nodoNombre(unidos(aux0), 200, vista));
+    const segundo = nodoNombre(unidos(f), 220, vista);
+    segundo.style.marginLeft = '18px';
+    nombres.append(segundo);
+  } else {
+    nombres.append(nodoNombre(unidos(f), 220, vista));
+  }
+  fila.append(nombres);
+  grupo.append(fila);
+
+  salas.slice(1).forEach((a) => {
+    const extra = nodo('fila extra-sala');
+    extra.append(nodo('fila-texto'));
+    const et = nodo('etiqueta');
+    et.textContent = conDosPuntos(a.etiqueta) || etiqPrin;
+    extra.append(et);
+    const noms = nodo('nombres');
+    noms.append(nodoNombre(unidos(a), 200, vista));
+    const vacio = nodoNombre('', 220, false);
+    vacio.style.marginLeft = '18px';
+    noms.append(vacio);
+    extra.append(noms);
+    grupo.append(extra);
+  });
+  return grupo;
+}
+
+function tituloEl(texto) {
+  const t = nodo('titulo');
+  t.textContent = texto || '';
+  return t;
+}
+
+function ajustarNombres(root) {
+  root.querySelectorAll('.nombre').forEach((n) => {
+    if (!n.textContent) return;
+    let size = 22;
+    n.style.fontSize = size + 'px';
+    while (size > 13 && n.scrollWidth > n.clientWidth + 1) {
+      size -= 1;
+      n.style.fontSize = size + 'px';
+    }
+  });
+}
+
+/**
+ * Dibuja la hoja con los datos de la planilla.
+ * @param {object} datos planilla completa
+ * @param {{ vista?: boolean }} [opciones] vista: true deja el nombre genérico en los vacíos
+ */
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  await document.fonts.ready;
+  const contenido = document.getElementById('contenido');
+  contenido.style.transform = 'none';
+  contenido.replaceChildren();
+
+  const d = datos || {};
+  const lista = Array.isArray(d.semanas) && d.semanas.length
+    ? d.semanas.map((sem) => ({ ...sem, congregacion: d.congregacion || sem.congregacion }))
+    : [{ ...d, congregacion: d.congregacion }];
+
+  const fecha = nodo('fecha');
+  const semana0 = lista[0] || {};
+  fecha.textContent = semana0.fecha || d.fecha || '';
+  contenido.append(fecha);
+
+  const congTxt = String(semana0.congregacion || d.congregacion || '').trim();
+  if (congTxt) {
+    const cong = nodo('cong');
+    cong.textContent = congTxt;
+    contenido.append(cong);
+  }
+
+  const agregar = (hijo, gap, fijo) => {
+    const b = nodo('bloque');
+    b.dataset.gap = String(gap || 0);
+    b.dataset.fijo = String(fijo || 0);
+    b.append(hijo);
+    contenido.append(b);
+  };
+  const linea = () => nodo('linea');
+  const claseSec = (sec) => {
+    const t = String(sec?.titulo || '');
+    if (/vida cristiana/i.test(t)) return 'vida';
+    if (/maestros/i.test(t)) return 'maestros';
+    if (/tesoros/i.test(t)) return 'tesoros';
+    const c = String(sec?.color || '').toLowerCase();
+    if (c === '#7d0022' || c === '#7e0024') return 'vida';
+    if (c === '#c18f00' || c === '#be8900') return 'maestros';
+    return 'tesoros';
+  };
+  const secciones = (listaSec, gapPrimera) => {
+    (listaSec || []).forEach((sec, i) => {
+      const tipo = claseSec(sec);
+      const conSalas = (tipo === 'tesoros' || tipo === 'maestros')
+        && (sec.filas || []).some((f) => (Array.isArray(f.salaAuxiliar) ? f.salaAuxiliar : []).length > 0);
+      const barra = nodo(`barra${conSalas ? ' con-salas' : ''}`);
+      barra.style.background = sec.color || '#575a5d';
+      const tit = nodo('barra-titulo');
+      tit.textContent = sec.titulo || '';
+      barra.append(tit);
+      if (conSalas) {
+        const aux = nodo('barra-sala');
+        aux.textContent = 'Sala auxiliar';
+        const prin = nodo('barra-sala');
+        prin.textContent = 'Auditorio principal';
+        barra.append(aux, prin);
+      }
+      agregar(barra, i === 0 ? gapPrimera : GAP.seccion);
+      (sec.filas || []).forEach((f, fi) => {
+        agregar(filaNodo(f, vista), fi === 0 ? GAP.barra : GAP.fila);
+      });
+    });
+  };
+
+  let reunionGlobal = 0;
+  lista.forEach((week, wi) => {
+    if (wi > 0) {
+      const meta = [week.fecha, week.lectura].map((x) => String(x || '').trim()).filter(Boolean).join(' | ');
+      if (meta) agregar(tituloEl(meta), GAP.extraAntes);
+    }
+    const reuniones = (Array.isArray(week.reuniones) ? week.reuniones : []).filter(Boolean);
+    reuniones.forEach((r) => {
+      if (reunionGlobal === 0) {
+        agregar(linea(), 0, 130);
+        agregar(tituloEl(r.titulo || week.titulo || d.titulo), GAP.tituloArriba);
+        agregar(personas([['Presidente:', r.presidente], ['Oración:', r.oracionInicio]], vista), GAP.tituloAbajo);
+      } else {
+        agregar(tituloEl(r.titulo || 'Reunión'), GAP.extraAntes);
+        agregar(personas([['Presidente:', r.presidente], ['Oración:', r.oracionInicio]], vista), GAP.extraTitulo);
+      }
+      secciones(r.secciones, GAP.primeraSeccion);
+      agregar(personas([['Oración:', r.oracionFinal]], vista), GAP.oracion);
+      agregar(linea(), reunionGlobal === 0 ? GAP.oracion : GAP.extraCierre);
+      reunionGlobal += 1;
+    });
+  });
+
+  const aplicar = (e, k) => {
+    contenido.querySelectorAll('.bloque').forEach((b) => {
+      b.style.marginTop = (Number(b.dataset.fijo) + Number(b.dataset.gap) * e) + 'px';
+    });
+    contenido.style.transform = k < 1 ? `scale(${k})` : 'none';
+  };
+  const alto = (e) => { aplicar(e, 1); return contenido.offsetHeight; };
+  const limite = HOJA_ALTO - MARGEN_INF;
+  const h0 = alto(0);
+  const h1 = alto(1);
+  let e = h1 > h0 ? (limite - h0) / (h1 - h0) : 1;
+  let k = 1;
+  if (e < E_MIN) {
+    e = E_MIN;
+    k = Math.min(1, limite / Math.max(1, alto(E_MIN)));
+  }
+  e = Math.min(E_MAX, e);
+  aplicar(e, k);
+  ajustarNombres(contenido);
+}
+
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  if (typeof html2canvas !== 'function') throw new Error('html2canvas');
+  const canvas = await html2canvas(document.getElementById('hoja'), {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    width: 1240,
+    height: 1754,
+    windowWidth: 1240,
+    windowHeight: 1754,
+    useCORS: true,
+  });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

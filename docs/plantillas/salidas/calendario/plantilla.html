@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Calendario del mes</title>
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="hoja"></div>
+  <script>
+'use strict';
+const hoja = () => document.getElementById('hoja');
+function claseDia(dia) {
+  const t = String(dia || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (t.includes('domingo')) return 'domingo';
+  if (t.includes('lunes')) return 'lunes';
+  if (t.includes('martes')) return 'martes';
+  if (t.includes('miercoles')) return 'miercoles';
+  if (t.includes('jueves')) return 'jueves';
+  if (t.includes('viernes')) return 'viernes';
+  if (t.includes('sabado')) return 'sabado';
+  return '';
+}
+function celda(valor, vista, placeholder) {
+  const td = document.createElement('td');
+  const t = String(valor || '').trim();
+  td.textContent = t || (vista ? placeholder : '');
+  if (!t && vista) td.classList.add('vacio');
+  return td;
+}
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  const s = (datos && datos.salidas) || { titulo: '', lista: [] };
+  const root = hoja();
+  root.replaceChildren();
+  const tabla = document.createElement('table');
+  tabla.innerHTML = '<colgroup><col class="fecha"><col class="hora"><col><col class="territorio"><col class="conductor"></colgroup>';
+  const head = document.createElement('thead');
+  const titulo = document.createElement('tr');
+  const thTitulo = document.createElement('th');
+  thTitulo.className = 'titulo';
+  thTitulo.colSpan = 5;
+  thTitulo.textContent = s.titulo || (vista ? 'Salidas del mes' : '');
+  titulo.append(thTitulo);
+  const columnas = document.createElement('tr');
+  ['Fecha', 'Hora', 'Punto de encuentro / RSC', 'Territorio', 'Conductor'].forEach((nombre) => {
+    const th = document.createElement('th');
+    th.textContent = nombre;
+    columnas.append(th);
+  });
+  head.append(titulo, columnas);
+  const body = document.createElement('tbody');
+  (s.lista || []).forEach((item) => {
+    const tr = document.createElement('tr');
+    tr.className = claseDia(item.dia);
+    tr.append(
+      celda(item.dia, vista, 'Día'),
+      celda(item.hora, vista, '00:00'),
+      celda(item.lugar, vista, 'Punto de encuentro'),
+      celda(item.territorio, vista, '—'),
+      celda(item.conductor, vista, 'Conductor'),
+    );
+    body.append(tr);
+  });
+  tabla.append(head, body);
+  root.append(tabla);
+}
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  const canvas = await html2canvas(hoja(), { scale: 2, backgroundColor: '#ffffff', width: 1240, height: 1754, windowWidth: 1240, windowHeight: 1754 });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

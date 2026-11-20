@@ -1,0 +1,10 @@
+services:
+  programa-semanal:
+    build: .
+    container_name: programa-semanal
+    restart: unless-stopped
+    ports:
+      - "8097:8097"
+    environment:
+      PORT: "8097"
+      NODE_ENV: production

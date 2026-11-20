@@ -1,0 +1,14 @@
+html, body { margin: 0; background: #fff; }
+#hoja {
+  width: 1240px; height: 1754px; box-sizing: border-box;
+  padding: 56px 64px; background: #fff; overflow: hidden;
+  color: #111; font: 20px/1.4 Calibri, "Segoe UI", Arial, sans-serif;
+}
+.titulo { margin: 0; font-size: 34px; text-align: center; }
+.sub { display: flex; justify-content: space-between; gap: 24px; margin: 8px 0 18px; padding-bottom: 10px; border-bottom: 3px solid #111; font-weight: 700; text-transform: uppercase; }
+.grupo { border: 2px solid #222; border-radius: 8px; padding: 14px 18px 10px; margin: 0 0 16px; }
+.grupo h2 { margin: 0 0 8px; font-size: 24px; }
+.meta { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+.etiq { color: #333; }
+.vacio { color: #b9b9b9; }
+.integrantes { margin: 6px 0 0; }

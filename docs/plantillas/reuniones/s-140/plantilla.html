@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>S-140</title>
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="hoja"><div id="contenido"></div></div>
+  <script>
+'use strict';
+
+const hoja = () => document.getElementById('hoja');
+const contenido = () => document.getElementById('contenido');
+const el = (clase) => { const n = document.createElement('div'); if (clase) n.className = clase; return n; };
+const txt = (v) => String(v == null ? '' : v).trim();
+
+function persona(valor, vista) {
+  const texto = txt(valor);
+  if (texto) return { texto, vacio: false };
+  if (vista) return { texto: 'Nombre y apellido', vacio: true };
+  return { texto: '', vacio: false };
+}
+function pareja(f, vista) {
+  const a = txt(f.nombre1);
+  const b = txt(f.nombre2);
+  if (a && b) return { texto: `${a} / ${b}`, vacio: false };
+  if (a || b) return { texto: a || b, vacio: false };
+  return persona('', vista);
+}
+function conDosPuntos(valor) {
+  const t = txt(valor);
+  if (!t) return '';
+  return /:\s*$/.test(t) ? t : `${t}:`;
+}
+function esPieza(texto) {
+  return /canci[oó]n|palabras de introducci[oó]n|palabras de conclusi[oó]n/i.test(texto);
+}
+function limpiarPrefijo(texto) {
+  return txt(texto)
+    .replace(/^(\d{1,2}:\d{2}|\d+)\s*mins?\.?\s*[•●·]?\s*/i, '')
+    .replace(/^[•●·]\s*/, '');
+}
+function vineta(texto) {
+  return txt(texto).replace(/^[•●]\s*/, '');
+}
+function textoCancion(valor, vista) {
+  let t = limpiarPrefijo(valor);
+  if (!t) return { texto: vista ? 'Canción' : '', vacio: !!vista };
+  if (!/canci[oó]n/i.test(t)) t = `Canción ${t}`;
+  return { texto: t, vacio: false };
+}
+function conMinutos(texto, tiempo) {
+  let t = txt(texto);
+  const raw = txt(tiempo);
+  if (!raw || /^\d{1,2}:\d{2}$/.test(raw)) return t;
+  let cuerpo = raw.replace(/^\(+|\)+\.?$/g, '').trim();
+  if (!cuerpo || !/\d/.test(cuerpo)) return t;
+  if (!/min/i.test(cuerpo)) cuerpo += ' mins.';
+  else if (/mins?$/i.test(cuerpo) && !/\.$/.test(cuerpo)) cuerpo += '.';
+  if (/\(\s*\d[^)]*min/i.test(t)) return t;
+  return t ? `${t} (${cuerpo})` : `(${cuerpo})`;
+}
+function textoCierre(valor, vista, defecto) {
+  const crudo = txt(valor);
+  if (!crudo) return { texto: vista ? defecto : '', vacio: !!vista };
+  const m = crudo.match(/^(\d{1,2}:\d{2}|\d+)\s*(mins?\.?)\s*[•●·]?\s*/i);
+  let t = limpiarPrefijo(crudo);
+  if (m && t && !/\([^)]*min/i.test(t)) {
+    const unidad = /s/i.test(m[2]) ? 'mins.' : 'min.';
+    t = `${t} (${m[1]} ${unidad})`;
+  }
+  return { texto: t, vacio: false };
+}
+/** Columna de hora: reloj 19:05, o duración tipo 60 min si no hay horario. */
+function horaColumna(...valores) {
+  for (const v of valores) {
+    const t = txt(v);
+    const m = t.match(/\b(\d{1,2}:\d{2})\b/);
+    if (m) return m[1];
+  }
+  for (const v of valores) {
+    const t = txt(v);
+    const m = t.match(/(?:^|[(\s])(\d+)\s*mins?\.?(?:\)|$|\s)/i) || t.match(/^(\d+)\s*mins?\.?$/i);
+    if (m) return `${m[1]} min`;
+  }
+  return '';
+}
+function claseSeccion(sec) {
+  const t = txt(sec && sec.titulo);
+  if (/vida cristiana/i.test(t)) return 'vida';
+  if (/maestros/i.test(t)) return 'maestros';
+  if (/tesoros/i.test(t)) return 'tesoros';
+  const c = txt(sec && sec.color).toLowerCase();
+  if (c === '#7d0022' || c === '#7e0024') return 'vida';
+  if (c === '#c18f00' || c === '#be8900') return 'maestros';
+  return 'tesoros';
+}
+function colorDe(sec) {
+  const c = txt(sec && sec.color);
+  const low = c.toLowerCase();
+  const tipo = claseSeccion(sec || {});
+  if (tipo === 'maestros') return (!c || low === '#c18f00') ? '#be8900' : c;
+  if (tipo === 'vida') return (!c || low === '#7d0022') ? '#7e0024' : c;
+  return c || '#575a5d';
+}
+function poner(padre, clase, texto, vacio) {
+  const n = el(`${clase}${vacio ? ' vacio' : ''}`);
+  n.textContent = texto || '';
+  padre.append(n);
+  return n;
+}
+function fila() { return el('fila'); }
+
+function reunionesDe(sem) {
+  if (!Array.isArray(sem.reuniones)) return [];
+  return sem.reuniones.filter(Boolean);
+}
+
+function pintarReunion(root, week, r, vista, opts = {}) {
+  if (opts.conEncabezado) {
+    const cabeza = el('encabezado');
+    const congTxt = txt(week.congregacion);
+    poner(cabeza, 'cong', congTxt || (vista ? 'Nombre de la congregación' : ''), !congTxt && vista);
+    const titulo = document.createElement('h1');
+    titulo.className = 'titulo';
+    titulo.textContent = 'Programa para la reunión de entre semana';
+    cabeza.append(titulo);
+    root.append(cabeza);
+    root.append(el('sep'));
+  } else {
+    root.append(el('sep'));
+    const cabeza = el('encabezado secundario');
+    const titulo = document.createElement('h1');
+    titulo.className = 'titulo';
+    titulo.textContent = txt(r.titulo) || 'Programa';
+    cabeza.append(titulo);
+    root.append(cabeza);
+    root.append(el('sep'));
+  }
+
+  // Lectura de la semana va con el bloque de la reunión (junto al título), no como "título de la lectura".
+  const lectura = txt(week.lectura);
+  const metaIzq = [txt(week.fecha), lectura].filter(Boolean).join(' | ');
+  const filaFecha = el('fila cargos');
+  poner(filaFecha, 'meta', metaIzq || (vista ? 'Fecha | Lectura de la semana' : ''), !metaIzq && vista);
+  poner(filaFecha, 'etiq', 'Presidente:');
+  const pres = persona(r.presidente, vista);
+  poner(filaFecha, 'nombre', pres.texto, pres.vacio);
+  root.append(filaFecha);
+
+  if (txt(r.consejero)) {
+    const filaCons = el('fila cargos');
+    poner(filaCons, 'meta', '');
+    poner(filaCons, 'etiq', 'Consejero de la sala auxiliar:');
+    const cons = persona(r.consejero, false);
+    poner(filaCons, 'nombre', cons.texto, cons.vacio);
+    root.append(filaCons);
+  }
+
+  root.append(el('sep'));
+
+  if (txt(r.cancionInicio) || txt(r.oracionInicio)) {
+    const cancion = textoCancion(r.cancionInicio, false);
+    const oracion = persona(r.oracionInicio, vista);
+    const filaCancion = el('fila cancion');
+    poner(filaCancion, 'tiempo', horaColumna(r.cancionInicio));
+    poner(filaCancion, 'texto pieza grande', vineta(cancion.texto), false);
+    poner(filaCancion, 'etiq gris', 'Oración:');
+    poner(filaCancion, 'nombre', oracion.texto, oracion.vacio);
+    root.append(filaCancion);
+  }
+
+  if (txt(r.introduccion)) {
+    const intro = textoCierre(r.introduccion, false, '');
+    const filaIntro = fila();
+    poner(filaIntro, 'tiempo', horaColumna(r.introduccion));
+    poner(filaIntro, 'texto pieza grande span-resto', vineta(intro.texto), false);
+    root.append(filaIntro);
+  }
+
+  const secciones = Array.isArray(r.secciones) ? r.secciones : [];
+  const idxVida = secciones.findIndex((sec) => claseSeccion(sec) === 'vida');
+
+  function parteNumerada(f, sec, index) {
+    const crudo = txt(f.texto);
+    const tieneSala = (Array.isArray(f.salaAuxiliar) ? f.salaAuxiliar : [])
+      .some((a) => txt(a.nombre1) || txt(a.nombre2));
+    if (!crudo && !txt(f.nombre1) && !txt(f.nombre2) && !tieneSala) return;
+    const tipo = claseSeccion(sec);
+    const hora = horaColumna(f.tiempo, f.texto);
+    const horaEsReloj = /^\d{1,2}:\d{2}$/.test(hora);
+
+    if (crudo && esPieza(crudo)) {
+      const filaP = fila();
+      poner(filaP, 'tiempo', hora);
+      const pieza = /canci[oó]n/i.test(crudo)
+        ? textoCancion(crudo, false).texto
+        : textoCierre(crudo, false, '').texto;
+      poner(filaP, 'texto pieza span-resto', vineta(pieza));
+      root.append(filaP);
+      return;
+    }
+
+    // Sin numeración 1. 2. 3. Si la columna ya muestra duración (60 min), no duplicar en el título.
+    let texto = crudo.replace(/^\d+\s*[.)]\s+/, '');
+    if (horaEsReloj || !hora) texto = conMinutos(texto, f.tiempo);
+    else texto = texto.replace(/\s*\(\s*\d+\s*mins?\.?\s*\)\.?\s*$/i, '').trim();
+
+    const lecturaBib = tipo === 'tesoros' && (
+      index === 2 || /lectura de la biblia/i.test(crudo) || /^estudiante:?$/i.test(txt(f.etiqueta))
+    );
+    const estudio = /estudio b[ií]blico/i.test(crudo) || /conductor\s*\/\s*lector/i.test(txt(f.etiqueta));
+    let etiqueta = conDosPuntos(f.etiqueta);
+    if (!etiqueta) {
+      if (lecturaBib) etiqueta = 'Estudiante:';
+      else if (tipo === 'maestros') etiqueta = 'Estudiante/Ayudante:';
+      else if (estudio) etiqueta = 'Conductor/Lector:';
+    }
+
+    const salas = Array.isArray(f.salaAuxiliar) ? f.salaAuxiliar : [];
+    const aux0 = salas[0];
+    const tieneAux = !!aux0;
+    const etiqAux = aux0 ? (conDosPuntos(aux0.etiqueta) || etiqueta || '') : '';
+    const nomAux = aux0 ? pareja(aux0, vista) : null;
+    const nomPrin = pareja(f, vista);
+    let etiqFila = '';
+    if (tipo === 'maestros') etiqFila = etiqAux || etiqueta || '';
+    else if (lecturaBib) etiqFila = etiqAux || etiqueta || 'Estudiante:';
+    else if (etiqueta) etiqFila = etiqAux || etiqueta;
+    else etiqFila = etiqAux || '';
+
+    const filaP = el(tieneAux ? 'fila' : 'fila sin-aux');
+    poner(filaP, 'tiempo', hora);
+    poner(filaP, 'texto grande', texto);
+    poner(filaP, 'etiq', etiqFila);
+    if (tieneAux) poner(filaP, 'nombre', nomAux.texto, nomAux.vacio);
+    poner(filaP, 'nombre', nomPrin.texto, nomPrin.vacio);
+    root.append(filaP);
+
+    salas.slice(1).forEach((a) => {
+      const extra = fila();
+      poner(extra, 'tiempo', '');
+      poner(extra, 'texto grande', '');
+      poner(extra, 'etiq', conDosPuntos(a.etiqueta) || etiqueta || '');
+      const na = pareja(a, vista);
+      poner(extra, 'nombre', na.texto, na.vacio);
+      poner(extra, 'nombre', '');
+      root.append(extra);
+    });
+  }
+
+  let mediaPuesta = false;
+  function cancionMedia() {
+    if (mediaPuesta || !txt(r.cancionIntermedia)) return;
+    mediaPuesta = true;
+    const media = textoCancion(r.cancionIntermedia, false);
+    const filaM = fila();
+    poner(filaM, 'tiempo', horaColumna(r.cancionIntermedia));
+    poner(filaM, 'texto pieza span-resto', vineta(media.texto));
+    root.append(filaM);
+  }
+
+  secciones.forEach((sec, i) => {
+    root.append(el('sep-sec'));
+    const tipo = claseSeccion(sec);
+    const cabezaSec = fila();
+    const conSalas = (tipo === 'tesoros' || tipo === 'maestros')
+      && (sec.filas || []).some((f) => (Array.isArray(f.salaAuxiliar) ? f.salaAuxiliar : []).length > 0);
+    const barra = poner(cabezaSec, `barra ${tipo}${conSalas ? ' con-salas' : ''}`, '');
+    barra.style.background = colorDe(sec);
+    const tit = el('barra-titulo');
+    tit.textContent = sec.titulo || '';
+    barra.append(tit);
+    if (conSalas) {
+      const sm = tipo === 'maestros' ? ' sm' : '';
+      const aux = el(`barra-sala aux${sm}`);
+      aux.textContent = 'Sala auxiliar';
+      const prin = el(`barra-sala prin${sm}`);
+      prin.textContent = 'Auditorio principal';
+      barra.append(aux, prin);
+    }
+    root.append(cabezaSec);
+    if (i === idxVida || /atalaya/i.test(txt(sec.titulo))) cancionMedia();
+    (sec.filas || []).forEach((f, fi) => parteNumerada(f, sec, fi));
+  });
+
+  if (!mediaPuesta && txt(r.cancionIntermedia)) {
+    root.append(el('sep-sec'));
+    cancionMedia();
+  }
+
+  if (txt(r.conclusion)) {
+    const cierre = textoCierre(r.conclusion, false, '');
+    const filaCierre = fila();
+    poner(filaCierre, 'tiempo', horaColumna(r.conclusion));
+    poner(filaCierre, 'texto pieza span-resto', vineta(cierre.texto), false);
+    root.append(filaCierre);
+  }
+
+  if (txt(r.cancionFinal) || txt(r.oracionFinal)) {
+    const finalCancion = textoCancion(r.cancionFinal, false);
+    const oracionFinal = persona(r.oracionFinal, vista);
+    const filaFinal = el('fila cancion');
+    poner(filaFinal, 'tiempo', horaColumna(r.cancionFinal));
+    poner(filaFinal, 'texto pieza grande', vineta(finalCancion.texto), false);
+    poner(filaFinal, 'etiq', 'Oración:');
+    poner(filaFinal, 'nombre', oracionFinal.texto, oracionFinal.vacio);
+    root.append(filaFinal);
+  }
+}
+
+const ESCALA_MIN = 0.72;
+
+function metaSemana(week, vista) {
+  const lectura = txt(week.lectura);
+  return [txt(week.fecha), lectura].filter(Boolean).join(' | ')
+    || (vista ? 'Fecha | Lectura de la semana' : '');
+}
+
+function pintarSemanaVacia(root, week, vista, { primario }) {
+  const bloque = el('bloque-reunion');
+  bloque.dataset.prioridad = primario ? '1' : '0';
+  if (primario) {
+    const cabeza = el('encabezado');
+    const congTxt = txt(week.congregacion);
+    poner(cabeza, 'cong', congTxt || (vista ? 'Nombre de la congregación' : ''), !congTxt && vista);
+    bloque.append(cabeza);
+    bloque.append(el('sep'));
+  } else {
+    bloque.append(el('sep'));
+  }
+  const metaIzq = metaSemana(week, vista);
+  if (metaIzq) {
+    const filaFecha = el('fila cargos');
+    poner(filaFecha, 'meta', metaIzq, !txt(week.fecha) && !txt(week.lectura) && vista);
+    bloque.append(filaFecha);
+    bloque.append(el('sep'));
+  }
+  root.append(bloque);
+}
+
+function ajustarEscala() {
+  const cont = contenido();
+  if (!cont) return;
+  cont.style.transform = 'none';
+  const usable = 1754 - 102 - 73;
+  const bloques = [...cont.querySelectorAll('.bloque-reunion')];
+  // Si dos bloques densos no caben a escala legible, priorizar el primero y recortar el resto.
+  while (bloques.length > 1 && cont.scrollHeight * ESCALA_MIN > usable) {
+    const ultimo = bloques.pop();
+    if (ultimo) ultimo.remove();
+  }
+  const natural = cont.scrollHeight;
+  if (natural <= usable) return;
+  const k = Math.max(ESCALA_MIN, usable / natural);
+  cont.style.transform = `scale(${k})`;
+}
+
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  const d = datos || {};
+  const root = contenido();
+  root.replaceChildren();
+  root.style.transform = 'none';
+  const lista = Array.isArray(d.semanas) && d.semanas.length ? d.semanas : [d];
+  let primero = true;
+  lista.forEach((sem) => {
+    const week = { ...sem, congregacion: d.congregacion || sem.congregacion };
+    const reuniones = reunionesDe(week);
+    if (!reuniones.length) {
+      // Primaria o secundaria: al menos fecha/regla (paridad compacta); no return silencioso.
+      pintarSemanaVacia(root, week, vista, { primario: primero });
+      primero = false;
+      return;
+    }
+    reuniones.forEach((r) => {
+      const bloque = el('bloque-reunion');
+      bloque.dataset.prioridad = primero ? '1' : '0';
+      pintarReunion(bloque, week, r, vista, { conEncabezado: primero });
+      root.append(bloque);
+      primero = false;
+    });
+  });
+  ajustarEscala();
+}
+
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  if (typeof html2canvas !== 'function') throw new Error('html2canvas');
+  const canvas = await html2canvas(hoja(), {
+    scale: 2, backgroundColor: '#ffffff', width: 1240, height: 1754, windowWidth: 1240, windowHeight: 1754,
+  });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Servicio del campo</title>
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="hoja"></div>
+  <script>
+'use strict';
+const hoja = () => document.getElementById('hoja');
+function celda(valor, vista, placeholder) {
+  const td = document.createElement('td');
+  const t = String(valor || '').trim();
+  td.textContent = t || (vista ? placeholder : '');
+  if (!t && vista) td.classList.add('vacio');
+  return td;
+}
+function encabezado() {
+  const tr = document.createElement('tr');
+  ['Día', 'Hora', 'Punto de reunión', 'Territorio', 'Conductor'].forEach((nombre) => {
+    const th = document.createElement('th');
+    th.textContent = nombre;
+    tr.append(th);
+  });
+  return tr;
+}
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  const s = (datos && datos.salidas) || { titulo: '', lista: [] };
+  const root = hoja();
+  root.replaceChildren();
+  const banner = document.createElement('div');
+  banner.className = 'banner';
+  banner.textContent = 'Programa del Servicio del Campo';
+  root.append(banner);
+  let tabla = null;
+  let mesActual = null;
+  const abrir = (mes) => {
+    if (mes) {
+      const barra = document.createElement('div');
+      barra.className = 'mes';
+      barra.textContent = mes;
+      root.append(barra);
+    }
+    tabla = document.createElement('table');
+    tabla.innerHTML = '<colgroup><col class="dia"><col class="hora"><col><col><col class="conductor"></colgroup>';
+    const head = document.createElement('thead');
+    head.append(encabezado());
+    tabla.append(head, document.createElement('tbody'));
+    root.append(tabla);
+  };
+  (s.lista || []).forEach((item) => {
+    const mes = String(item.mes || '').trim();
+    if (!tabla || (mes && mes !== mesActual)) {
+      mesActual = mes;
+      abrir(mes);
+    }
+    const tr = document.createElement('tr');
+    if (item.destacada) tr.className = 'destacada';
+    tr.append(
+      celda(item.dia, vista, 'Día'),
+      celda(item.hora, vista, '0:00'),
+      celda(item.lugar, vista, 'Punto de reunión'),
+      celda(item.territorio, vista, 'Territorio'),
+      celda(item.conductor, vista, 'Conductor'),
+    );
+    tabla.querySelector('tbody').append(tr);
+  });
+  if (!tabla) abrir('');
+}
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  const canvas = await html2canvas(hoja(), { scale: 2, backgroundColor: '#ffffff', width: 1240, height: 1754, windowWidth: 1240, windowHeight: 1754 });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

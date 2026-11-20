@@ -1,0 +1,27 @@
+html, body { margin: 0; background: #fff; }
+#hoja {
+  width: 1240px; height: 1754px; box-sizing: border-box;
+  padding: 28px; background: #fff; overflow: hidden;
+  color: #111; font: 700 16px/1.25 Arial, Calibri, sans-serif;
+}
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.titulo {
+  background: #ffe14a; color: #b00020; text-align: center;
+  font-size: 28px; letter-spacing: 0.4px; text-transform: uppercase;
+  border: 2px solid #222; padding: 8px;
+}
+th {
+  background: #ffe14a; color: #222; border: 2px solid #222;
+  padding: 6px 4px; text-transform: uppercase; font-size: 15px;
+}
+td { border: 1px solid #333; text-align: center; padding: 5px 6px; vertical-align: middle; white-space: pre-line; }
+.vacio { color: #9a9a9a; font-weight: 500; }
+tr.domingo td { background: #f4b183; }
+tr.lunes td, tr.martes td, tr.jueves td { background: #ffe699; }
+tr.miercoles td { background: #92d050; }
+tr.viernes td { background: #5b9bd5; }
+tr.sabado td { background: #00b0f0; }
+col.fecha { width: 18%; }
+col.hora { width: 10%; }
+col.territorio { width: 14%; }
+col.conductor { width: 22%; }

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Grupos</title>
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="hoja"></div>
+  <script>
+'use strict';
+const hoja = () => document.getElementById('hoja');
+const el = (clase) => { const n = document.createElement('div'); if (clase) n.className = clase; return n; };
+function texto(clase, valor, vista, placeholder) {
+  const n = document.createElement('span');
+  const t = String(valor || '').trim();
+  n.className = clase + (!t && vista ? ' vacio' : '');
+  n.textContent = t || (vista ? placeholder : '');
+  return n;
+}
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  const d = datos || {};
+  const g = d.grupos || { titulo: 'Grupos de predicación', lista: [] };
+  const root = hoja();
+  root.replaceChildren();
+  const titulo = document.createElement('h1');
+  titulo.className = 'titulo';
+  titulo.textContent = g.titulo || 'Grupos de predicación';
+  root.append(titulo);
+  const sub = el('sub');
+  sub.append(texto('', d.congregacion, vista, 'Congregación'));
+  sub.append(texto('', d.fecha, vista, 'Fecha'));
+  root.append(sub);
+  (g.lista || []).forEach((item) => {
+    const caja = el('grupo');
+    const h = document.createElement('h2');
+    h.textContent = item.nombre || (vista ? 'Grupo' : '');
+    caja.append(h);
+    const meta = el('meta');
+    const izq = el('');
+    izq.append(texto('etiq', 'Conductor: ', false, ''));
+    izq.append(texto('', item.conductor, vista, 'Nombre y apellido'));
+    if (item.ayudante || vista) {
+      izq.append(document.createTextNode('   ·   Ayudante: '));
+      izq.append(texto('', item.ayudante, vista, 'Nombre y apellido'));
+    }
+    const der = el('');
+    der.append(texto('', [item.hora, item.lugar].filter(Boolean).join(' · ') || (vista ? 'Hora · lugar' : ''), vista && !item.hora && !item.lugar, 'Hora · lugar'));
+    meta.append(izq, der);
+    caja.append(meta);
+    const gente = el('integrantes');
+    gente.append(texto('etiq', 'Integrantes: ', false, ''));
+    gente.append(texto('', item.integrantes, vista, 'Nombres'));
+    caja.append(gente);
+    root.append(caja);
+  });
+}
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  const canvas = await html2canvas(hoja(), { scale: 2, backgroundColor: '#ffffff', width: 1240, height: 1754, windowWidth: 1240, windowHeight: 1754 });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

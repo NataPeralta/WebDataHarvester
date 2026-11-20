@@ -1,0 +1,10 @@
+[
+  { "id": "s-140", "nombre": "S-140 oficial", "tipo": "reuniones" },
+  { "id": "compacta", "nombre": "Compacta", "tipo": "reuniones", "formato": "njk" },
+  { "id": "programa-semanal", "nombre": "Programa semanal", "tipo": "reuniones" },
+  { "id": "columnas", "nombre": "Grupos de predicación", "tipo": "grupos" },
+  { "id": "lista", "nombre": "Lista de grupos", "tipo": "grupos" },
+  { "id": "calendario", "nombre": "Calendario del mes", "tipo": "salidas" },
+  { "id": "cuadro", "nombre": "Cuadro por grupo", "tipo": "salidas" },
+  { "id": "servicio-campo", "nombre": "Servicio del campo", "tipo": "salidas" }
+]

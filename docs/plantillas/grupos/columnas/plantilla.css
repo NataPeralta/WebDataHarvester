@@ -1,0 +1,101 @@
+html, body { margin: 0; background: #fff; }
+#hoja {
+  width: 1240px;
+  height: 1754px;
+  box-sizing: border-box;
+  padding: 28px 32px 24px;
+  background: #fff;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+}
+.cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 14px;
+  font: 700 18px/1.2 Arial, Helvetica, sans-serif;
+}
+.cabecera .cong { flex: 1; }
+.cabecera .act { white-space: nowrap; }
+.hoja-grupos {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.par {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1.5px solid #111;
+  border-bottom: none;
+}
+.par:last-child { border-bottom: 1.5px solid #111; }
+.par + .par { border-top: none; }
+.grupo-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1.5px solid #111;
+}
+.par .grupo-col:last-child { border-right: none; }
+.grupo-titulo {
+  text-align: center;
+  font: 700 17px/1.25 Arial, Helvetica, sans-serif;
+  padding: 6px 8px;
+  border-bottom: 1.5px solid #111;
+  text-transform: none;
+}
+.grupo-cuerpo {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0 0;
+}
+.fila {
+  display: grid;
+  grid-template-columns: 42px 1fr 64px;
+  align-items: center;
+  min-height: 22px;
+  border-bottom: 1px solid #cfcfcf;
+  font: 700 13px/1.15 Arial, Helvetica, sans-serif;
+}
+.fila:last-child { border-bottom: none; }
+.fila .etiq {
+  text-align: center;
+  color: #222;
+  font-size: 12px;
+}
+.fila .nombre {
+  text-align: left;
+  padding: 2px 8px;
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fila .marca {
+  text-align: center;
+  font-size: 11px;
+  padding-right: 4px;
+  color: #222;
+}
+.fila.sin-etiq {
+  grid-template-columns: 1fr 64px;
+}
+.fila.sin-etiq .etiq { display: none; }
+.inactivos {
+  border-top: 1.5px solid #111;
+  padding: 6px 8px 8px;
+  font: 700 12px/1.25 Arial, Helvetica, sans-serif;
+  min-height: 42px;
+}
+.inactivos .etiq-in {
+  display: inline;
+}
+.vacio { color: #9a9a9a; font-weight: 500; }

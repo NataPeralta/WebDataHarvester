@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Grupos de predicación</title>
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="hoja"></div>
+  <script>
+'use strict';
+const hoja = () => document.getElementById('hoja');
+
+function limpia(s) {
+  return String(s || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function esEtiqueta(s) {
+  return /^(sup\.?g?\.?|aux\.?|sup|auxiliar|\d+)$/i.test(limpia(s));
+}
+
+/** Convierte listado / conductor / integrantes en filas {etiqueta,nombre,marca}. */
+function filasDe(item, vista) {
+  let texto = String(item.listado || '').trim();
+  if (!texto) {
+    const lineas = [];
+    if (item.conductor) lineas.push(`Sup | ${item.conductor}`);
+    if (item.ayudante) lineas.push(`Aux | ${item.ayudante}`);
+    String(item.integrantes || '').split(/[,;\n]/).map((s) => s.trim()).filter(Boolean)
+      .forEach((nombre) => lineas.push(nombre));
+    texto = lineas.join('\n');
+  }
+
+  const crudas = texto.split('\n').map((l) => l.replace(/\r/g, '')).filter((l) => l.trim() !== '');
+  const filas = [];
+  let fase = 0;
+  let numero = 1;
+
+  crudas.forEach((linea) => {
+    const raw = linea.trim();
+    // "10.Nombre" o "10. Nombre"
+    const numLead = raw.match(/^(\d+)\s*[.\-–)]\s*(.*)$/);
+    if (numLead && !raw.includes('|')) {
+      const n = parseInt(numLead[1], 10);
+      filas.push({ etiqueta: String(n), nombre: limpia(numLead[2]), marca: '' });
+      numero = n + 1;
+      fase = 2;
+      return;
+    }
+
+    const partes = raw.split('|').map((s) => s.trim());
+    let etiqueta = '';
+    let nombre = '';
+    let marca = '';
+
+    if (partes.length >= 3 && esEtiqueta(partes[0])) {
+      etiqueta = partes[0];
+      nombre = partes[1];
+      marca = partes.slice(2).join(', ');
+    } else if (partes.length === 2 && esEtiqueta(partes[0])) {
+      etiqueta = partes[0];
+      nombre = partes[1];
+    } else if (partes.length === 2) {
+      nombre = partes[0];
+      marca = partes[1];
+    } else {
+      nombre = partes[0];
+      // Marcas al final del nombre: (PR), P.R., Aux, Sup.G., etc.
+      const m = nombre.match(/\s+(\((?:PR|SM)\)|P\.?\s*R\.?|S\.?M\.?P?\.?R?\.?|Sup\.?\s*G(?:rupo)?\.?|Aux(?:iliar)?\.?)\s*$/i);
+      if (m) {
+        marca = limpia(m[1]);
+        nombre = limpia(nombre.slice(0, -m[0].length));
+      }
+    }
+
+    if (!etiqueta) {
+      if (fase === 0) etiqueta = 'Sup';
+      else if (fase === 1) etiqueta = 'Aux';
+      else etiqueta = String(numero++);
+      fase = Math.min(fase + 1, 2);
+    } else if (/^\d+$/.test(etiqueta)) {
+      numero = parseInt(etiqueta, 10) + 1;
+      fase = 2;
+    } else if (/^sup/i.test(etiqueta)) {
+      etiqueta = 'Sup';
+      fase = Math.max(fase, 1);
+    } else if (/^aux/i.test(etiqueta)) {
+      etiqueta = 'Aux';
+      fase = 2;
+    }
+
+    filas.push({ etiqueta, nombre: limpia(nombre), marca: limpia(marca) });
+  });
+
+  if (!filas.length && vista) {
+    return [
+      { etiqueta: 'Sup', nombre: '', marca: '' },
+      { etiqueta: 'Aux', nombre: '', marca: '' },
+      ...Array.from({ length: 8 }, (_, i) => ({ etiqueta: String(i + 1), nombre: '', marca: '' })),
+    ];
+  }
+  return filas;
+}
+
+function celdaTexto(valor, vista, placeholder) {
+  const t = limpia(valor);
+  const span = document.createElement('span');
+  span.textContent = t || (vista ? placeholder : '');
+  if (!t && vista && placeholder) span.classList.add('vacio');
+  return span;
+}
+
+function renderFila(fila, vista) {
+  const row = document.createElement('div');
+  const etiq = limpia(fila.etiqueta);
+  const conEtiq = !!etiq;
+  row.className = 'fila' + (conEtiq ? '' : ' sin-etiq');
+
+  const e = document.createElement('div');
+  e.className = 'etiq';
+  e.textContent = etiq;
+
+  const n = document.createElement('div');
+  n.className = 'nombre';
+  const nt = limpia(fila.nombre);
+  n.textContent = nt || (vista ? 'Nombre' : '');
+  if (!nt && vista) n.classList.add('vacio');
+
+  const m = document.createElement('div');
+  m.className = 'marca';
+  m.textContent = limpia(fila.marca);
+
+  row.append(e, n, m);
+  return row;
+}
+
+function renderGrupo(item, i, vista) {
+  const col = document.createElement('div');
+  col.className = 'grupo-col';
+
+  const titulo = document.createElement('div');
+  titulo.className = 'grupo-titulo';
+  titulo.style.background = item.color || '#ffe600';
+  titulo.textContent = limpia(item.nombre) || (vista ? `Grupo de predicación N ${i + 1}` : '');
+  if (!limpia(item.nombre) && vista) titulo.classList.add('vacio');
+
+  const cuerpo = document.createElement('div');
+  cuerpo.className = 'grupo-cuerpo';
+  filasDe(item, vista).forEach((f) => cuerpo.append(renderFila(f, vista)));
+
+  const inact = document.createElement('div');
+  inact.className = 'inactivos';
+  const label = document.createElement('span');
+  label.className = 'etiq-in';
+  label.textContent = 'Inactivos: ';
+  inact.append(label);
+  inact.append(celdaTexto(item.inactivos, vista, '—'));
+
+  col.append(titulo, cuerpo, inact);
+  return col;
+}
+
+function textoActualizado(d) {
+  if (limpia(d.grupos?.actualizado)) return limpia(d.grupos.actualizado);
+  if (limpia(d.fecha)) return `Actualizado ${limpia(d.fecha)}`;
+  return '';
+}
+
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  const d = datos || {};
+  const g = d.grupos || { lista: [] };
+  const lista = Array.isArray(g.lista) ? g.lista : [];
+  const root = hoja();
+  root.replaceChildren();
+
+  const cab = document.createElement('div');
+  cab.className = 'cabecera';
+  const cong = document.createElement('div');
+  cong.className = 'cong';
+  const ct = limpia(d.congregacion);
+  cong.textContent = ct ? `Congregación ${ct}` : (vista ? 'Congregación' : '');
+  if (!ct && vista) cong.classList.add('vacio');
+  const act = document.createElement('div');
+  act.className = 'act';
+  const at = textoActualizado(d);
+  act.textContent = at || (vista ? 'Actualizado' : '');
+  if (!at && vista) act.classList.add('vacio');
+  cab.append(cong, act);
+  root.append(cab);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'hoja-grupos';
+
+  const items = lista.length ? lista : (vista ? [{}, {}, {}, {}] : []);
+  for (let i = 0; i < items.length; i += 2) {
+    const par = document.createElement('div');
+    par.className = 'par';
+    par.append(renderGrupo(items[i], i, vista));
+    if (items[i + 1]) par.append(renderGrupo(items[i + 1], i + 1, vista));
+    else {
+      const vacio = document.createElement('div');
+      vacio.className = 'grupo-col';
+      par.append(vacio);
+    }
+    wrap.append(par);
+  }
+  root.append(wrap);
+}
+
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  const canvas = await html2canvas(hoja(), {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    width: 1240,
+    height: 1754,
+    windowWidth: 1240,
+    windowHeight: 1754,
+  });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

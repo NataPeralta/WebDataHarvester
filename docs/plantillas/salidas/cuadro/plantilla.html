@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Cuadro por grupo</title>
+  <link rel="stylesheet" href="plantilla.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="hoja"></div>
+  <script>
+'use strict';
+const hoja = () => document.getElementById('hoja');
+function celda(valor, vista, placeholder, clase) {
+  const td = document.createElement('td');
+  const t = String(valor || '').trim();
+  td.textContent = t || (vista ? placeholder : '');
+  if (clase) td.className = clase;
+  if (!t && vista) td.classList.add('vacio');
+  return td;
+}
+async function render(datos, opciones = {}) {
+  const vista = !!opciones.vista;
+  const s = (datos && datos.salidas) || { titulo: '', lista: [] };
+  const root = hoja();
+  root.replaceChildren();
+  if (s.titulo) {
+    const h = document.createElement('h1');
+    h.className = 'titulo';
+    h.textContent = s.titulo;
+    root.append(h);
+  }
+  const tabla = document.createElement('table');
+  tabla.innerHTML = '<colgroup><col class="dia"><col class="hora"><col><col class="responsable"><col class="territorio"></colgroup>';
+  const columnas = document.createElement('tr');
+  ['Día', 'Hora', 'Lugar', 'Responsable', 'Territorio'].forEach((nombre) => {
+    const th = document.createElement('th');
+    th.textContent = nombre;
+    columnas.append(th);
+  });
+  const head = document.createElement('thead');
+  head.append(columnas);
+  const body = document.createElement('tbody');
+  (s.lista || []).forEach((item) => {
+    const tr = document.createElement('tr');
+    tr.append(
+      celda(item.dia, vista, 'Día', 'dia'),
+      celda(item.hora, vista, '00:00hs'),
+      celda(item.lugar, vista, 'Lugar'),
+      celda(item.conductor, vista, 'Responsable'),
+      celda(item.territorio, vista, '—'),
+    );
+    body.append(tr);
+  });
+  tabla.append(head, body);
+  root.append(tabla);
+}
+async function exportarPNG(datos) {
+  await render(datos, { vista: false });
+  const canvas = await html2canvas(hoja(), { scale: 2, backgroundColor: '#ffffff', width: 1240, height: 1754, windowWidth: 1240, windowHeight: 1754 });
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  await render(datos, { vista: true });
+  return blob;
+}
+  </script>
+</body>
+</html>

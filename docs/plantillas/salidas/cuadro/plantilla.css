@@ -1,0 +1,16 @@
+html, body { margin: 0; background: #fff; }
+#hoja {
+  width: 1240px; height: 1754px; box-sizing: border-box;
+  padding: 36px; background: #fff; overflow: hidden;
+  color: #111; font: 700 18px/1.25 Arial, Calibri, sans-serif;
+}
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.titulo { text-align: center; font-size: 28px; margin: 0 0 12px; text-transform: uppercase; }
+th, td { border: 2px solid #222; text-align: center; padding: 8px 6px; vertical-align: middle; background: #fff; }
+th { font-size: 18px; text-transform: uppercase; }
+td.dia { background: #f8cbad; white-space: pre-line; }
+.vacio { color: #9a9a9a; font-weight: 500; }
+col.dia { width: 22%; }
+col.hora { width: 14%; }
+col.responsable { width: 20%; }
+col.territorio { width: 16%; }

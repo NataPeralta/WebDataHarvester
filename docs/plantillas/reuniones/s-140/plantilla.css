@@ -1,0 +1,169 @@
+html, body { margin: 0; background: #fff; }
+#hoja {
+  width: 1240px;
+  height: 1754px;
+  box-sizing: border-box;
+  padding: 102px 115px 73px;
+  background: #fff;
+  overflow: hidden;
+  color: #111;
+  font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+  position: relative;
+}
+#contenido {
+  transform-origin: top left;
+}
+
+/* Misma tabla de 14 columnas del Word, agrupada en 5 pistas útiles */
+.fila {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 168px 237px 247px;
+  align-items: center;
+  min-height: 29px;
+  column-gap: 0;
+}
+
+.encabezado {
+  display: grid;
+  grid-template-columns: 341px minmax(0, 1fr);
+  align-items: end;
+  border-bottom: 2.25px solid #575a5d;
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+.encabezado.secundario {
+  grid-template-columns: 1fr;
+  margin-top: 10px;
+}
+.cong {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+  padding: 0 4px 2px 11px;
+}
+.titulo {
+  margin: 0;
+  padding: 0 11px 0 8px;
+  text-align: right;
+  font-family: Cambria, "Times New Roman", Times, serif;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+.encabezado.secundario .titulo {
+  text-align: left;
+  font-size: 28px;
+  padding-left: 11px;
+}
+
+.sep { height: 15px; }
+.sep-sec { height: 13px; }
+
+.tiempo {
+  padding-left: 11px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: #575a5d;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.meta {
+  grid-column: 1 / 3;
+  padding-left: 11px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #808080;
+  text-transform: uppercase;
+}
+.fila.cargos .etiq { grid-column: 3 / 5; }
+.fila.cargos .nombre { grid-column: 5; }
+.fila.cancion .texto { grid-column: 2 / 3; }
+.fila.cancion .etiq { grid-column: 3 / 5; }
+.fila.cancion .nombre { grid-column: 5; }
+/* Sin sala auxiliar: colapsar etiqueta+nombre (sin hueco de columna aux) */
+.fila.sin-aux .etiq { grid-column: 3 / 5; }
+.fila.sin-aux .nombre { grid-column: 5; }
+.texto {
+  min-width: 0;
+  padding-left: 11px;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.texto.grande { font-size: 24px; }
+.pieza {
+  padding-left: 11px;
+}
+.etiq {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: #575a5d;
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+.etiq.gris { color: #808080; }
+.nombre {
+  min-width: 0;
+  padding: 0 4px 0 11px;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.barra {
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 11px;
+  background: #575a5d;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-sizing: border-box;
+  grid-column: 1 / -1;
+}
+.barra.con-salas {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 168px 237px 247px;
+  align-items: center;
+  column-gap: 0;
+  padding: 2px 0;
+}
+.barra-titulo {
+  grid-column: 1 / 4;
+  min-width: 0;
+  padding: 0 11px;
+  color: #fff;
+  font: inherit;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.barra-sala {
+  padding-left: 11px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: none;
+  white-space: nowrap;
+}
+.barra-sala.aux { grid-column: 4; }
+.barra-sala.prin { grid-column: 5; }
+.barra-sala.sm { font-size: 16px; }
+.vacio { color: #b9b9b9; }
+
+.span-medio { grid-column: 2 / 4; }
+.span-resto { grid-column: 2 / -1; }
+.span-titulo-corto { grid-column: 2 / 3; }
+.span-etiq-ancha { grid-column: 3 / 4; }
