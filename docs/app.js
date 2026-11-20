@@ -13,12 +13,13 @@ const fila = (texto, nombre1 = '', nombre2 = '', etiqueta = '', dos = false) => 
 // Modelo en blanco: no trae ningún nombre. Los nombres para autocompletar se arman
 // en cada dispositivo a partir de lo que se escribe ahí (ver "nombres" más abajo).
 const MODELO = {
-  sinNumeros: true,
+  version: 3,
   semana: '',
   fecha: '',
   titulo: 'LECTURA SEMANAL DE LA BIBLIA',
   presidente: '',
   oracionInicio: '',
+  oracionFinal: '',
   secciones: [
     {
       titulo: 'TESOROS DE LA BIBLIA', color: '#575a5d',
@@ -52,8 +53,9 @@ const EXTRAS = [
 ];
 const extrasModelo = () => ({
   finde: {
-    activo: true, titulo: 'REUNIÓN DEL FIN DE SEMANA', color: '#1f6f78',
-    filas: [fila('Discursante'), fila('Conductor de La Atalaya'), fila('Lector')],
+    activo: true, titulo: 'REUNIÓN DE FIN DE SEMANA', color: '#1f6f78',
+    oracionInicio: '', oracionFinal: '',
+    filas: [fila('Discursante'), fila('Conductor de La Atalaya / Lector', '', '', '', true)],
   },
   asignaciones: {
     activo: true, titulo: 'ASIGNACIONES', color: '#4b6a3f',
@@ -62,18 +64,31 @@ const extrasModelo = () => ({
 });
 MODELO.extras = extrasModelo();
 
-// Completa los datos guardados con versiones anteriores que no tenían los bloques opcionales.
+// Completa y actualiza datos guardados con versiones anteriores de la planilla.
 function normalizar(s) {
   const base = extrasModelo();
   s.extras = s.extras || {};
   for (const { clave } of EXTRAS) s.extras[clave] = { ...base[clave], ...(s.extras[clave] || {}) };
-  // Una sola vez: quita la numeración ("1.", "2." …) del comienzo de las partes ya guardadas.
-  if (!s.sinNumeros) {
+  const v = s.version || (s.sinNumeros ? 2 : 1);
+  if (v < 2) {
+    // Quita la numeración ("1.", "2." …) del comienzo de las partes.
     (s.secciones || []).forEach((sec) => (sec.filas || []).forEach((f) => {
       f.texto = String(f.texto || '').replace(/^\s*\d+\s*[.)]\s*/, '');
     }));
-    s.sinNumeros = true;
   }
+  if (v < 3) {
+    // Conductor de La Atalaya y Lector pasan a una sola fila; cambia el título del fin de semana.
+    const fd = s.extras.finde;
+    const ic = fd.filas.findIndex((f) => /^conductor de la atalaya$/i.test(String(f.texto).trim()));
+    const il = fd.filas.findIndex((f) => /^lector$/i.test(String(f.texto).trim()));
+    if (ic >= 0 && il >= 0) {
+      fd.filas[ic] = fila('Conductor de La Atalaya / Lector', fd.filas[ic].nombre1, fd.filas[il].nombre1, '', true);
+      fd.filas.splice(il, 1);
+    }
+    if (fd.titulo === 'REUNIÓN DEL FIN DE SEMANA') fd.titulo = 'REUNIÓN DE FIN DE SEMANA';
+  }
+  s.version = 3;
+  delete s.sinNumeros;
   return s;
 }
 
@@ -143,7 +158,8 @@ let estado = normalizar(leer(KEY_ESTADO, null) || clonar(MODELO));
 let nombres = new Set(leer(KEY_NOMBRES, []));
 
 function recolectarNombres(s) {
-  [s.presidente, s.oracionInicio,
+  [s.presidente, s.oracionInicio, s.oracionFinal,
+    ...Object.values(s.extras || {}).flatMap((e) => [e.oracionInicio, e.oracionFinal]),
     ...[...(s.secciones || []), ...Object.values(s.extras || {})]
       .flatMap((x) => (x.filas || []).flatMap((f) => [f.nombre1, f.nombre2]))]
     .forEach((n) => { n = String(n || '').trim(); if (n) nombres.add(n); });
@@ -214,14 +230,18 @@ function htmlSeccion(sec, si) {
 function htmlExtra({ clave, etiqueta }) {
   const sec = estado.extras[clave];
   const base = `extras.${clave}`;
-  return `
-    <fieldset class="card" style="--section-color:${esc(sec.color)}">
+  const nombreInput = (campo, titulo) => `
+        <label>${titulo}
+          <input type="text" class="nombre" list="nombres" data-path="${base}.${campo}" value="${esc(sec[campo])}" placeholder="Nombre y apellido">
+        </label>`;
+  const cabecera = clave === 'finde' ? `
       <div class="section-head">
-        <label class="check">
-          <input type="checkbox" data-path="${base}.activo"${sec.activo ? ' checked' : ''}>
-          Incluir “${esc(etiqueta)}” en la imagen
+        <label>Título
+          <input type="text" data-path="${base}.titulo" value="${esc(sec.titulo)}">
         </label>
       </div>
+      <div class="grid-2">${nombreInput('oracionInicio', 'Oración inicial')}${nombreInput('oracionFinal', 'Oración final')}
+      </div>` : `
       <div class="section-head">
         <label>Título de la barra
           <input type="text" data-path="${base}.titulo" value="${esc(sec.titulo)}">
@@ -229,7 +249,15 @@ function htmlExtra({ clave, etiqueta }) {
         <label class="color-label">Color
           <input type="color" data-path="${base}.color" value="${esc(sec.color)}">
         </label>
-      </div>
+      </div>`;
+  return `
+    <fieldset class="card" style="--section-color:${esc(sec.color)}">
+      <div class="section-head">
+        <label class="check">
+          <input type="checkbox" data-path="${base}.activo"${sec.activo ? ' checked' : ''}>
+          Incluir “${esc(etiqueta)}” en la imagen
+        </label>
+      </div>${cabecera}
       ${htmlFilas(sec, base, { parte: 'Asignación', segundo: 'Segundo nombre (opcional)' })}
       <button type="button" class="btn ghost small" data-action="agregar-fila" data-base="${base}">+ Agregar</button>
     </fieldset>`;
@@ -276,7 +304,8 @@ const acciones = {
     base.setDate(base.getDate() + 7);
     estado.semana = aISO(base);
     estado.fecha = textoSemana(estado.semana);
-    estado.presidente = estado.oracionInicio = '';
+    estado.presidente = estado.oracionInicio = estado.oracionFinal = '';
+    estado.extras.finde.oracionInicio = estado.extras.finde.oracionFinal = '';
     [...estado.secciones, ...Object.values(estado.extras)]
       .forEach((x) => x.filas.forEach((f) => { f.nombre1 = ''; f.nombre2 = ''; }));
     toast('Nueva semana lista para completar');
@@ -337,7 +366,7 @@ $('#planilla').addEventListener('change', (e) => {
 
 const W = 1240;
 const LINEA_SUP = 150;
-const LINEA_INF_BASE = 985;
+const LINEA_INF_BASE = 1065;
 const MARGEN_INF = 278;
 // Grilla de la imagen: las líneas van de 62 a 1178 y todo lo demás respeta un margen interno de 30 px.
 const LINEA_X = 62;
@@ -414,7 +443,7 @@ function componer(ctx, s, dibujar) {
   ctx.textBaseline = 'middle';
 
   // Encabezado
-  // Título centrado y, debajo, presidente y oración en una fila también centrada.
+  // Título centrado y, debajo, presidente y oración en una fila alineada a la izquierda.
   const yHead = LINEA_SUP + 47;
   ctx.font = F.titulo;
   letterSpacing(ctx, '1.5px');
@@ -435,8 +464,8 @@ function componer(ctx, s, dibujar) {
   }));
 
   // Alturas fijas y pesos de los espacios flexibles
-  let fijo = altoEncabezado;
-  let pesos = 1.0; // espacio antes de la línea que cierra el programa
+  let fijo = altoEncabezado + ALTO_LINEA; // + la fila de la oración final
+  let pesos = 2.0; // espacio antes de la oración final y antes de la línea que cierra el programa
   for (const sec of secciones) {
     fijo += ALTO_BARRA + BARRA_GAP;
     pesos += 1.0;
@@ -446,8 +475,9 @@ function componer(ctx, s, dibujar) {
   const G = Math.min(72, Math.max(22, (disponible - fijo) / pesos));
   const lineaInf = Math.max(LINEA_INF_BASE, Math.ceil(LINEA_SUP + fijo + pesos * G));
 
-  // Bloques opcionales (fin de semana, asignaciones): van debajo de un divisor, con espaciado fijo.
-  const extras = EXTRAS.map(({ clave }) => s.extras?.[clave]).filter((e) => e && e.activo && e.filas.length)
+  // Bloques opcionales (fin de semana, asignaciones): cada uno va debajo de una línea y se cierra con otra.
+  const extras = EXTRAS.map(({ clave }) => ({ clave, ...(s.extras?.[clave] || {}) }))
+    .filter((e) => e.activo && e.filas && e.filas.length)
     .map((e) => ({
       ...e,
       filas: e.filas.map((f) => {
@@ -455,12 +485,15 @@ function componer(ctx, s, dibujar) {
         return { ...f, lineas, alto: Math.max(lineas.length, 1) * ALTO_LINEA };
       }),
     }));
-  let altoExtras = 0;
-  for (const e of extras) {
-    altoExtras += EXT_ANTES_BARRA + ALTO_BARRA + EXT_TRAS_BARRA;
-    e.filas.forEach((f, i) => { altoExtras += f.alto + (i > 0 ? EXT_ENTRE_FILAS : 0); });
-  }
-  const lineaFin = extras.length ? lineaInf + 6 + altoExtras + EXT_CIERRE : lineaInf;
+  let yExt = lineaInf + 6;
+  const bloques = extras.map((e) => {
+    const h = bloqueExtra(ctx, e, 0, false);
+    const b = { e, y: yExt, h };
+    yExt += h + 6;
+    return b;
+  });
+  const ultimo = bloques[bloques.length - 1];
+  const lineaFin = ultimo ? ultimo.y + ultimo.h : lineaInf;
   const alto = lineaFin + MARGEN_INF;
   if (!dibujar) return alto;
 
@@ -470,7 +503,7 @@ function componer(ctx, s, dibujar) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(LINEA_X, LINEA_SUP, LINEA_ANCHO, 6);
   ctx.fillRect(LINEA_X, lineaInf, LINEA_ANCHO, 6); // cierra el programa de entre semana (o es el divisor si hay bloques debajo)
-  if (extras.length) ctx.fillRect(LINEA_X, lineaFin, LINEA_ANCHO, 6);
+  bloques.forEach((b) => ctx.fillRect(LINEA_X, b.y + b.h, LINEA_ANCHO, 6)); // cada bloque se cierra con una línea
 
   // La fecha va arriba del primer divisor, a la izquierda.
   ctx.fillStyle = '#1a1a1a';
@@ -485,8 +518,8 @@ function componer(ctx, s, dibujar) {
   letterSpacing(ctx, '0px');
   ctx.textAlign = 'left';
 
-  // Presidente y oración
-  dibujarPersonas(ctx, [['Presidente:', s.presidente], ['Oración:', s.oracionInicio]], yPersonas);
+  // Presidente y oración, a la izquierda
+  dibujarPersonas(ctx, [['Presidente:', s.presidente], ['Oración:', s.oracionInicio]], yPersonas, X_IZQ);
 
   // Secciones
   let y = yFinEnc;
@@ -502,19 +535,48 @@ function componer(ctx, s, dibujar) {
     });
   }
 
-  // Bloques opcionales debajo del divisor
-  y = lineaInf + 6;
-  for (const e of extras) {
-    y += EXT_ANTES_BARRA;
-    dibujarBarra(ctx, e, y);
-    y += ALTO_BARRA + EXT_TRAS_BARRA;
-    e.filas.forEach((f, i) => {
-      if (i > 0) y += EXT_ENTRE_FILAS;
-      dibujarFila(ctx, f, y);
-      y += f.alto;
-    });
-  }
+  // Oración final del programa de entre semana
+  y += G;
+  dibujarPersonas(ctx, [['Oración:', s.oracionFinal]], y + ALTO_LINEA / 2, X_IZQ);
+
+  // Bloques opcionales
+  bloques.forEach((b) => bloqueExtra(ctx, b.e, b.y, true));
   return alto;
+}
+
+/** Dibuja (o solo mide) un bloque opcional que arranca en y0. Devuelve su alto, hasta donde va la línea que lo cierra. */
+function bloqueExtra(ctx, e, y0, dibujar) {
+  const esFinde = e.clave === 'finde';
+  let y = y0 + EXT_ANTES_BARRA;
+  if (esFinde) {
+    // Título centrado (como el del programa de entre semana) y la oración inicial debajo.
+    if (dibujar) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = F.titulo;
+      ctx.textAlign = 'center';
+      letterSpacing(ctx, '1.5px');
+      ctx.fillText(e.titulo || '', CENTRO, y + 14);
+      letterSpacing(ctx, '0px');
+      ctx.textAlign = 'left';
+    }
+    y += 28 + EXT_TRAS_BARRA;
+    if (dibujar) dibujarPersonas(ctx, [['Oración:', e.oracionInicio]], y + ALTO_LINEA / 2, X_IZQ);
+    y += ALTO_LINEA + EXT_TRAS_BARRA;
+  } else {
+    if (dibujar) dibujarBarra(ctx, e, y);
+    y += ALTO_BARRA + EXT_TRAS_BARRA;
+  }
+  e.filas.forEach((f, i) => {
+    if (i > 0) y += EXT_ENTRE_FILAS;
+    if (dibujar) dibujarFila(ctx, f, y);
+    y += f.alto;
+  });
+  if (esFinde) {
+    y += EXT_TRAS_BARRA;
+    if (dibujar) dibujarPersonas(ctx, [['Oración:', e.oracionFinal]], y + ALTO_LINEA / 2, X_IZQ);
+    y += ALTO_LINEA;
+  }
+  return y + EXT_CIERRE - y0;
 }
 
 function dibujarBarra(ctx, sec, y) {
@@ -543,15 +605,15 @@ function dibujarFila(ctx, f, y) {
   }
 }
 
-/** Fila centrada con pares "Etiqueta: nombre". Cada nombre tiene un ancho fijo para que el conjunto no se mueva. */
-function dibujarPersonas(ctx, grupos, y) {
+/** Fila de pares "Etiqueta: nombre". Cada nombre tiene un ancho fijo para que el conjunto no se mueva. */
+function dibujarPersonas(ctx, grupos, y, xInicio) {
   const ANCHO_NOMBRE = 200;
   const SEP = 14;
   const ENTRE = 90;
   ctx.font = F.etiqueta;
   const anchos = grupos.map(([etiq]) => ctx.measureText(etiq).width);
   const total = anchos.reduce((a, w) => a + w + SEP + ANCHO_NOMBRE, 0) + ENTRE * (grupos.length - 1);
-  let x = CENTRO - total / 2;
+  let x = xInicio ?? CENTRO - total / 2;
   grupos.forEach(([etiq, nombre], i) => {
     ctx.font = F.etiqueta;
     ctx.fillStyle = '#3a3a3a';
