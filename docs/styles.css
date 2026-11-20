@@ -168,3 +168,8 @@ textarea { resize: vertical; }
 }
 .section-head label.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .section-head + .section-head { margin-top: -12px; border-radius: 0; }
+
+/* La hoja A4 entera tiene que verse en pantallas de escritorio sin cortarse. */
+@media (min-width: 901px) {
+  #lienzo { width: auto; max-width: 100%; max-height: calc(100vh - 96px); margin: 0 auto; }
+}

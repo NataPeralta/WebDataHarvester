@@ -53,12 +53,12 @@ const EXTRAS = [
 ];
 const extrasModelo = () => ({
   finde: {
-    activo: true, titulo: 'REUNIÓN DE FIN DE SEMANA', color: '#1f6f78',
+    activo: true, titulo: 'REUNIÓN DE FIN DE SEMANA',
     oracionInicio: '', oracionFinal: '',
     filas: [fila('Discursante'), fila('Conductor de La Atalaya / Lector', '', '', '', true)],
   },
   asignaciones: {
-    activo: true, titulo: 'ASIGNACIONES', color: '#4b6a3f',
+    activo: true, titulo: 'ASIGNACIONES',
     filas: [fila('Microfonista', '', '', '', true), fila('Sonido'), fila('Zoom'), fila('Acomodadores', '', '', '', true), fila('Puerta')],
   },
 });
@@ -234,24 +234,16 @@ function htmlExtra({ clave, etiqueta }) {
         <label>${titulo}
           <input type="text" class="nombre" list="nombres" data-path="${base}.${campo}" value="${esc(sec[campo])}" placeholder="Nombre y apellido">
         </label>`;
-  const cabecera = clave === 'finde' ? `
+  const cabecera = `
       <div class="section-head">
         <label>Título
           <input type="text" data-path="${base}.titulo" value="${esc(sec.titulo)}">
         </label>
-      </div>
+      </div>` + (clave === 'finde' ? `
       <div class="grid-2">${nombreInput('oracionInicio', 'Oración inicial')}${nombreInput('oracionFinal', 'Oración final')}
-      </div>` : `
-      <div class="section-head">
-        <label>Título de la barra
-          <input type="text" data-path="${base}.titulo" value="${esc(sec.titulo)}">
-        </label>
-        <label class="color-label">Color
-          <input type="color" data-path="${base}.color" value="${esc(sec.color)}">
-        </label>
-      </div>`;
+      </div>` : '');
   return `
-    <fieldset class="card" style="--section-color:${esc(sec.color)}">
+    <fieldset class="card">
       <div class="section-head">
         <label class="check">
           <input type="checkbox" data-path="${base}.activo"${sec.activo ? ' checked' : ''}>
@@ -364,11 +356,15 @@ $('#planilla').addEventListener('change', (e) => {
 
 /* ---------- Imagen ---------- */
 
+// Hoja A4 vertical a 150 ppp: 1240 × 1754 px. Al descargar se genera al doble (2480 × 3508 px, A4 a 300 ppp).
 const W = 1240;
-const LINEA_SUP = 150;
-const LINEA_INF_BASE = 1065;
-const MARGEN_INF = 278;
-// Grilla de la imagen: las líneas van de 62 a 1178 y todo lo demás respeta un margen interno de 30 px.
+const H = 1754;
+const LINEA_SUP = 130;
+const MARGEN_INF = 70; // la última línea nunca pasa de H - MARGEN_INF
+const E_MIN = 0.3; // los espacios se achican hasta 30 % antes de reducir todo el contenido
+const E_MAX = 1.6; // y se agrandan hasta 160 % cuando sobra lugar
+
+// Grilla: las líneas van de 62 a 1178 y todo lo demás respeta un margen interno de 30 px.
 const LINEA_X = 62;
 const LINEA_ANCHO = 1116;
 const X_IZQ = 92; // margen interno izquierdo: fecha y barras
@@ -377,21 +373,32 @@ const CENTRO = 620;
 const ANCHO_BARRA = 580;
 const X_TEXTO = 103; // las partes arrancan alineadas con el título de la barra
 const ANCHO_TEXTO = 470;
-const ALTO_LINEA = 30;
-const ALTO_BARRA = 28;
-const ROW_GAP = 22; // espacio entre las partes de una sección
-const BARRA_GAP = 28; // espacio entre la barra y su primera parte
-const EXT_ANTES_BARRA = 36;
-const EXT_TRAS_BARRA = 24;
-const EXT_ENTRE_FILAS = 16;
-const EXT_CIERRE = 40;
 const X_NOMBRE_A = 700; // primera columna de nombres (también la de los nombres solos)
 const X_NOMBRE_B = 930; // segunda columna (ayudante)
+const ALTO_LINEA = 30;
+const ALTO_BARRA = 28;
+const ALTO_TITULO = 28;
+
+// Espacios en px con elasticidad 1. Se multiplican por un factor que hace que todo entre justo en la hoja.
+const GAP = {
+  tituloArriba: 27, // línea superior → título
+  tituloAbajo: 23, // título → presidente y oración
+  primeraSeccion: 65,
+  seccion: 50,
+  barra: 28, // barra → primera parte
+  fila: 22, // entre partes de una sección
+  oracion: 50, // antes de la oración final y antes de la línea de cierre
+  extraAntes: 36,
+  extraTitulo: 24, // título → oración / primera fila
+  extraFila: 16,
+  extraCierre: 40,
+};
 
 // En la vista previa, los lugares vacíos muestran un nombre genérico en gris.
 // Al descargar la imagen no se dibuja: un lugar vacío queda vacío.
 const NOMBRE_GENERICO = 'Nombre y apellido';
 let modoVista = true;
+let escalaSalida = 1;
 
 const F = {
   fecha: '600 27px Montserrat',
@@ -438,145 +445,99 @@ function textoAjustado(ctx, texto, x, y, anchoMax, px = 22) {
   ctx.fillText(texto, x, y);
 }
 
-/** Calcula posiciones y dibuja. Devuelve el alto usado. */
-function componer(ctx, s, dibujar) {
+/**
+ * Recorre la hoja de arriba hacia abajo. Si `dibujar` es false solo mide.
+ * `e` es la elasticidad de los espacios: con e = 0 queda lo mínimo y con e = 1 el diseño base.
+ * Devuelve la posición donde termina la última línea.
+ */
+function componer(ctx, s, e, dibujar) {
+  const g = (v) => v * e;
   ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
 
-  // Encabezado
-  // Título centrado y, debajo, presidente y oración en una fila alineada a la izquierda.
-  const yHead = LINEA_SUP + 47;
+  // Medir
   ctx.font = F.titulo;
   letterSpacing(ctx, '1.5px');
   const lineasTitulo = partirLineas(ctx, s.titulo, LINEA_ANCHO - 100);
   letterSpacing(ctx, '0px');
-  const yPersonas = yHead + (lineasTitulo.length - 1) * 28 + 52;
-  const yFinEnc = yPersonas + 30;
-  const altoEncabezado = yFinEnc - LINEA_SUP;
-
-  // Medir filas
   ctx.font = F.texto;
-  const secciones = s.secciones.map((sec) => ({
-    ...sec,
-    filas: sec.filas.map((f) => {
-      const lineas = partirLineas(ctx, f.texto, ANCHO_TEXTO);
-      return { ...f, lineas, alto: Math.max(lineas.length, 1) * ALTO_LINEA };
-    }),
-  }));
-
-  // Alturas fijas y pesos de los espacios flexibles
-  let fijo = altoEncabezado + ALTO_LINEA; // + la fila de la oración final
-  let pesos = 2.0; // espacio antes de la oración final y antes de la línea que cierra el programa
-  for (const sec of secciones) {
-    fijo += ALTO_BARRA + BARRA_GAP;
-    pesos += 1.0;
-    sec.filas.forEach((f, i) => { fijo += f.alto + (i > 0 ? ROW_GAP : 0); });
-  }
-  const disponible = LINEA_INF_BASE - LINEA_SUP;
-  const G = Math.min(72, Math.max(22, (disponible - fijo) / pesos));
-  const lineaInf = Math.max(LINEA_INF_BASE, Math.ceil(LINEA_SUP + fijo + pesos * G));
-
-  // Bloques opcionales (fin de semana, asignaciones): cada uno va debajo de una línea y se cierra con otra.
+  const medir = (f) => {
+    const lineas = partirLineas(ctx, f.texto, ANCHO_TEXTO);
+    return { ...f, lineas, alto: Math.max(lineas.length, 1) * ALTO_LINEA };
+  };
+  const secciones = s.secciones.map((sec) => ({ ...sec, filas: sec.filas.map(medir) }));
   const extras = EXTRAS.map(({ clave }) => ({ clave, ...(s.extras?.[clave] || {}) }))
-    .filter((e) => e.activo && e.filas && e.filas.length)
-    .map((e) => ({
-      ...e,
-      filas: e.filas.map((f) => {
-        const lineas = partirLineas(ctx, f.texto, ANCHO_TEXTO);
-        return { ...f, lineas, alto: Math.max(lineas.length, 1) * ALTO_LINEA };
-      }),
-    }));
-  let yExt = lineaInf + 6;
-  const bloques = extras.map((e) => {
-    const h = bloqueExtra(ctx, e, 0, false);
-    const b = { e, y: yExt, h };
-    yExt += h + 6;
-    return b;
-  });
-  const ultimo = bloques[bloques.length - 1];
-  const lineaFin = ultimo ? ultimo.y + ultimo.h : lineaInf;
-  const alto = lineaFin + MARGEN_INF;
-  if (!dibujar) return alto;
+    .filter((x) => x.activo && x.filas && x.filas.length)
+    .map((x) => ({ ...x, filas: x.filas.map(medir) }));
 
-  // Fondo y líneas
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, alto);
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(LINEA_X, LINEA_SUP, LINEA_ANCHO, 6);
-  ctx.fillRect(LINEA_X, lineaInf, LINEA_ANCHO, 6); // cierra el programa de entre semana (o es el divisor si hay bloques debajo)
-  bloques.forEach((b) => ctx.fillRect(LINEA_X, b.y + b.h, LINEA_ANCHO, 6)); // cada bloque se cierra con una línea
-
-  // La fecha va arriba del primer divisor, a la izquierda.
-  ctx.fillStyle = '#1a1a1a';
-  ctx.textAlign = 'left';
-  if (s.fecha) { ctx.font = F.fecha; ctx.fillText(s.fecha, X_IZQ, LINEA_SUP - 42); }
-
-  // Título centrado
-  ctx.font = F.titulo;
-  ctx.textAlign = 'center';
-  letterSpacing(ctx, '1.5px');
-  lineasTitulo.forEach((l, i) => ctx.fillText(l, CENTRO, yHead + i * 28));
-  letterSpacing(ctx, '0px');
-  ctx.textAlign = 'left';
-
-  // Presidente y oración, a la izquierda
-  dibujarPersonas(ctx, [['Presidente:', s.presidente], ['Oración:', s.oracionInicio]], yPersonas, X_IZQ);
-
-  // Secciones
-  let y = yFinEnc;
-  for (const sec of secciones) {
-    y += G;
-    dibujarBarra(ctx, sec, y);
-    y += ALTO_BARRA + BARRA_GAP;
-
-    sec.filas.forEach((f, i) => {
-      if (i > 0) y += ROW_GAP;
-      dibujarFila(ctx, f, y);
-      y += f.alto;
-    });
-  }
-
-  // Oración final del programa de entre semana
-  y += G;
-  dibujarPersonas(ctx, [['Oración:', s.oracionFinal]], y + ALTO_LINEA / 2, X_IZQ);
-
-  // Bloques opcionales
-  bloques.forEach((b) => bloqueExtra(ctx, b.e, b.y, true));
-  return alto;
-}
-
-/** Dibuja (o solo mide) un bloque opcional que arranca en y0. Devuelve su alto, hasta donde va la línea que lo cierra. */
-function bloqueExtra(ctx, e, y0, dibujar) {
-  const esFinde = e.clave === 'finde';
-  let y = y0 + EXT_ANTES_BARRA;
-  if (esFinde) {
-    // Título centrado (como el del programa de entre semana) y la oración inicial debajo.
-    if (dibujar) {
-      ctx.fillStyle = '#1a1a1a';
-      ctx.font = F.titulo;
-      ctx.textAlign = 'center';
-      letterSpacing(ctx, '1.5px');
-      ctx.fillText(e.titulo || '', CENTRO, y + 14);
-      letterSpacing(ctx, '0px');
-      ctx.textAlign = 'left';
-    }
-    y += 28 + EXT_TRAS_BARRA;
-    if (dibujar) dibujarPersonas(ctx, [['Oración:', e.oracionInicio]], y + ALTO_LINEA / 2, X_IZQ);
-    y += ALTO_LINEA + EXT_TRAS_BARRA;
-  } else {
-    if (dibujar) dibujarBarra(ctx, e, y);
-    y += ALTO_BARRA + EXT_TRAS_BARRA;
-  }
-  e.filas.forEach((f, i) => {
-    if (i > 0) y += EXT_ENTRE_FILAS;
+  let y = LINEA_SUP;
+  const linea = () => {
+    if (dibujar) { ctx.fillStyle = '#000000'; ctx.fillRect(LINEA_X, y, LINEA_ANCHO, 6); }
+    y += 6;
+  };
+  const oracion = (nombre) => {
+    if (dibujar) dibujarPersonas(ctx, [['Oración:', nombre]], y + ALTO_LINEA / 2, X_IZQ);
+    y += ALTO_LINEA;
+  };
+  const filas = (lista, gapFila) => lista.forEach((f, i) => {
+    if (i > 0) y += g(gapFila);
     if (dibujar) dibujarFila(ctx, f, y);
     y += f.alto;
   });
-  if (esFinde) {
-    y += EXT_TRAS_BARRA;
-    if (dibujar) dibujarPersonas(ctx, [['Oración:', e.oracionFinal]], y + ALTO_LINEA / 2, X_IZQ);
-    y += ALTO_LINEA;
+
+  // La fecha va arriba del primer divisor, a la izquierda.
+  if (dibujar && s.fecha) {
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = F.fecha;
+    ctx.fillText(s.fecha, X_IZQ, LINEA_SUP - 46);
   }
-  return y + EXT_CIERRE - y0;
+  linea();
+
+  // Título centrado y, debajo, presidente y oración a la izquierda
+  y += g(GAP.tituloArriba);
+  if (dibujar) lineasTitulo.forEach((l, i) => tituloCentrado(ctx, l, y + i * 28));
+  y += lineasTitulo.length * 28 + g(GAP.tituloAbajo);
+  if (dibujar) dibujarPersonas(ctx, [['Presidente:', s.presidente], ['Oración:', s.oracionInicio]], y + ALTO_LINEA / 2, X_IZQ);
+  y += ALTO_LINEA;
+
+  // Secciones
+  secciones.forEach((sec, i) => {
+    y += g(i === 0 ? GAP.primeraSeccion : GAP.seccion);
+    if (dibujar) dibujarBarra(ctx, sec, y);
+    y += ALTO_BARRA + g(GAP.barra);
+    filas(sec.filas, GAP.fila);
+  });
+
+  // Oración final y línea que cierra el programa de entre semana
+  y += g(GAP.oracion);
+  oracion(s.oracionFinal);
+  y += g(GAP.oracion);
+  linea();
+
+  // Bloques opcionales: título centrado, sus filas y una línea que los cierra
+  for (const x of extras) {
+    const esFinde = x.clave === 'finde';
+    y += g(GAP.extraAntes);
+    if (dibujar) tituloCentrado(ctx, x.titulo || '', y);
+    y += ALTO_TITULO + g(GAP.extraTitulo);
+    if (esFinde) { oracion(x.oracionInicio); y += g(GAP.extraTitulo); }
+    filas(x.filas, GAP.extraFila);
+    if (esFinde) { y += g(GAP.extraTitulo); oracion(x.oracionFinal); }
+    y += g(GAP.extraCierre);
+    linea();
+  }
+  return y;
+}
+
+/** Título en mayúsculas, centrado; `yTop` es el borde superior de su renglón. */
+function tituloCentrado(ctx, texto, yTop) {
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = F.titulo;
+  ctx.textAlign = 'center';
+  letterSpacing(ctx, '1.5px');
+  ctx.fillText(texto, CENTRO, yTop + ALTO_TITULO / 2);
+  letterSpacing(ctx, '0px');
+  ctx.textAlign = 'left';
 }
 
 function dibujarBarra(ctx, sec, y) {
@@ -638,13 +599,36 @@ function nombreVisible(ctx, nombre) {
   return '';
 }
 
+/** Dibuja la hoja A4 completa: ajusta los espacios para que todo entre y, si no alcanza, reduce el contenido. */
 async function dibujar() {
   await fuentesListas;
   const canvas = $('#lienzo');
+  const px = escalaSalida;
+  if (canvas.width !== W * px || canvas.height !== H * px) {
+    canvas.width = W * px;
+    canvas.height = H * px;
+  }
   const ctx = canvas.getContext('2d');
-  const alto = componer(ctx, estado, false);
-  if (canvas.height !== alto) canvas.height = alto;
-  componer(ctx, estado, true);
+  ctx.setTransform(px, 0, 0, px, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  const limite = H - MARGEN_INF;
+  const h0 = componer(ctx, estado, 0, false);
+  const h1 = componer(ctx, estado, 1, false);
+  let e = h1 > h0 ? (limite - h0) / (h1 - h0) : 1;
+  let k = 1;
+  if (e < E_MIN) {
+    // Aun con los espacios al mínimo no entra: se reduce todo el contenido para que quepa en la hoja.
+    e = E_MIN;
+    k = Math.min(1, limite / componer(ctx, estado, E_MIN, false));
+  }
+  e = Math.min(E_MAX, e);
+
+  ctx.save();
+  if (k < 1) { ctx.translate(CENTRO, 0); ctx.scale(k, k); ctx.translate(-CENTRO, 0); }
+  componer(ctx, estado, e, true);
+  ctx.restore();
 }
 
 let pendiente = false;
@@ -656,11 +640,13 @@ function programarDibujo() {
 
 async function generarBlob() {
   modoVista = false; // la imagen descargada no lleva nombres genéricos
+  escalaSalida = 2; // A4 a 300 ppp
   try {
     await dibujar();
     return await new Promise((res) => $('#lienzo').toBlob(res, 'image/png'));
   } finally {
     modoVista = true;
+    escalaSalida = 1;
     programarDibujo();
   }
 }
