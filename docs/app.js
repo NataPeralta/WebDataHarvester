@@ -1841,10 +1841,51 @@ function datosParaPlantilla() {
 
 let captura = 0;
 
+/** html2canvas a veces no aplica <link rel=stylesheet>; inlinamos reglas locales. */
+function asegurarCssInline(doc) {
+  if (!doc || doc.getElementById('css-h2c')) return;
+  const trozos = [];
+  for (const sheet of doc.styleSheets) {
+    let reglas;
+    try {
+      reglas = sheet.cssRules;
+    } catch {
+      continue; // CSS cross-origin (fuentes, etc.)
+    }
+    if (!reglas) continue;
+    for (const regla of reglas) trozos.push(regla.cssText);
+  }
+  if (!trozos.length) return;
+  const tag = doc.createElement('style');
+  tag.id = 'css-h2c';
+  tag.textContent = trozos.join('\n');
+  doc.head.appendChild(tag);
+}
+
+function esperarHojasEstilo(doc, ms = 2000) {
+  const links = [...doc.querySelectorAll('link[rel="stylesheet"]')];
+  if (!links.length) return Promise.resolve();
+  return Promise.all(links.map((link) => new Promise((resolve) => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; resolve(); } };
+    try { if (link.sheet) { fin(); return; } } catch { /* ignore */ }
+    link.addEventListener('load', fin, { once: true });
+    link.addEventListener('error', fin, { once: true });
+    setTimeout(fin, ms);
+  })));
+}
+
 async function proyectarCanvas(win) {
   const hoja = win.document.getElementById('hoja');
   const lienzo = $('#vista-canvas');
   if (!hoja || !lienzo || typeof win.html2canvas !== 'function') return;
+  await esperarHojasEstilo(win.document);
+  try {
+    if (win.document.fonts?.ready) await win.document.fonts.ready;
+  } catch { /* ignore */ }
+  asegurarCssInline(win.document);
+  // Dos frames para que layout/CSS queden aplicados antes del raster.
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const id = ++captura;
   const pintado = await win.html2canvas(hoja, {
     scale: 1,
