@@ -13,12 +13,11 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="topbar-row">
+    <div class="topbar-main">
       <h1>Programa</h1>
-      <nav id="nav-tipos" class="tipos" aria-label="Tipos de plantilla"></nav>
       <div class="topbar-actions">
         <div class="menu-descarga">
-          <button type="button" class="btn primary" id="btn-descargar" aria-expanded="false" aria-haspopup="true" aria-controls="menu-descarga">
+          <button type="button" class="btn primary btn-compact" id="btn-descargar" aria-expanded="false" aria-haspopup="true" aria-controls="menu-descarga">
             <span>Descargar</span>
             <span class="flecha" aria-hidden="true"></span>
           </button>
@@ -27,16 +26,21 @@
             <button type="button" class="btn primary" data-action="descargar-pdf">PDF</button>
           </div>
         </div>
-        <button type="button" class="btn" data-action="compartir" id="btn-compartir" hidden>Compartir</button>
+        <button type="button" class="btn btn-compact" data-action="compartir" id="btn-compartir" hidden>Compartir</button>
       </div>
     </div>
-    <div class="plantillas-row">
+    <div class="topbar-navs topbar-scroll" role="navigation" aria-label="Tipo y plantilla">
+      <nav id="nav-tipos" class="tipos" aria-label="Tipos de plantilla"></nav>
+      <span class="topbar-sep" aria-hidden="true"></span>
       <nav id="nav-plantillas" class="plantillas-nav" aria-label="Plantillas de este tipo"></nav>
-      <label class="cong-top">Congregación
-        <input type="text" id="campo-congregacion" data-path="congregacion" placeholder="Oeste – Tres Arroyos" autocomplete="organization">
+    </div>
+    <div class="topbar-meta">
+      <label class="cong-top">
+        <span class="cong-label">Congregación</span>
+        <input type="text" id="campo-congregacion" data-path="congregacion" placeholder="Congregación" autocomplete="organization" aria-label="Congregación">
       </label>
       <div class="nombres-wrap">
-        <button type="button" class="btn" id="btn-nombres" aria-expanded="false" aria-controls="popup-nombres">Nombres</button>
+        <button type="button" class="btn btn-compact" id="btn-nombres" aria-expanded="false" aria-controls="popup-nombres">Nombres</button>
         <div id="popup-nombres" class="popup-nombres" hidden role="dialog" aria-label="Lista de nombres para autocompletar">
           <p class="popup-titulo">Lista de nombres para autocompletar</p>
           <p class="hint">Uno por línea. Los nombres nuevos que escribas en la planilla se agregan solos.</p>
